@@ -168,6 +168,63 @@ export type Database = {
           },
         ]
       }
+      payments: {
+        Row: {
+          created_at: string | null
+          id: number
+          order_id: number | null
+          payment_amount: number
+          payment_details: Json | null
+          payment_gateway: string
+          payment_id: string | null
+          payment_method: string | null
+          payment_status: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: number
+          order_id?: number | null
+          payment_amount: number
+          payment_details?: Json | null
+          payment_gateway: string
+          payment_id?: string | null
+          payment_method?: string | null
+          payment_status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: number
+          order_id?: number | null
+          payment_amount?: number
+          payment_details?: Json | null
+          payment_gateway?: string
+          payment_id?: string | null
+          payment_method?: string | null
+          payment_status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string | null
@@ -290,6 +347,44 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_locations: {
+        Row: {
+          address: string
+          created_at: string | null
+          id: number
+          is_default: boolean | null
+          latitude: number | null
+          longitude: number | null
+          user_id: string | null
+        }
+        Insert: {
+          address: string
+          created_at?: string | null
+          id?: number
+          is_default?: boolean | null
+          latitude?: number | null
+          longitude?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          address?: string
+          created_at?: string | null
+          id?: number
+          is_default?: boolean | null
+          latitude?: number | null
+          longitude?: number | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_locations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
