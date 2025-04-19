@@ -9,13 +9,300 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      categories: {
+        Row: {
+          description: string | null
+          id: number
+          image_url: string | null
+          name: string
+        }
+        Insert: {
+          description?: string | null
+          id?: never
+          image_url?: string | null
+          name: string
+        }
+        Update: {
+          description?: string | null
+          id?: never
+          image_url?: string | null
+          name?: string
+        }
+        Relationships: []
+      }
+      coupons: {
+        Row: {
+          active: boolean | null
+          code: string
+          description: string | null
+          discount_type: string | null
+          discount_value: number
+          expires_at: string | null
+          id: number
+          usage_limit: number | null
+        }
+        Insert: {
+          active?: boolean | null
+          code: string
+          description?: string | null
+          discount_type?: string | null
+          discount_value: number
+          expires_at?: string | null
+          id?: number
+          usage_limit?: number | null
+        }
+        Update: {
+          active?: boolean | null
+          code?: string
+          description?: string | null
+          discount_type?: string | null
+          discount_value?: number
+          expires_at?: string | null
+          id?: number
+          usage_limit?: number | null
+        }
+        Relationships: []
+      }
+      order_items: {
+        Row: {
+          id: number
+          item_total: number
+          order_id: number | null
+          quantity: number
+          service_id: number | null
+          service_name: string | null
+          unit_price: number
+        }
+        Insert: {
+          id?: number
+          item_total: number
+          order_id?: number | null
+          quantity: number
+          service_id?: number | null
+          service_name?: string | null
+          unit_price: number
+        }
+        Update: {
+          id?: number
+          item_total?: number
+          order_id?: number | null
+          quantity?: number
+          service_id?: number | null
+          service_name?: string | null
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          address: string | null
+          coupon_id: number | null
+          created_at: string | null
+          id: number
+          latitude: number | null
+          longitude: number | null
+          payment_id: string | null
+          payment_status: string | null
+          scheduled_at: string
+          status: string | null
+          total_amount: number | null
+          user_id: string | null
+        }
+        Insert: {
+          address?: string | null
+          coupon_id?: number | null
+          created_at?: string | null
+          id?: number
+          latitude?: number | null
+          longitude?: number | null
+          payment_id?: string | null
+          payment_status?: string | null
+          scheduled_at: string
+          status?: string | null
+          total_amount?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          address?: string | null
+          coupon_id?: number | null
+          created_at?: string | null
+          id?: number
+          latitude?: number | null
+          longitude?: number | null
+          payment_id?: string | null
+          payment_status?: string | null
+          scheduled_at?: string
+          status?: string | null
+          total_amount?: number | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_coupon_id_fkey"
+            columns: ["coupon_id"]
+            isOneToOne: false
+            referencedRelation: "coupons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string | null
+          full_name: string | null
+          id: string
+          phone: string | null
+          role: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          full_name?: string | null
+          id: string
+          phone?: string | null
+          role?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+          role?: string | null
+        }
+        Relationships: []
+      }
+      reviews: {
+        Row: {
+          admin_response: string | null
+          comment: string | null
+          created_at: string | null
+          id: number
+          is_approved: boolean | null
+          order_id: number | null
+          rating: number | null
+          service_id: number | null
+          user_id: string | null
+        }
+        Insert: {
+          admin_response?: string | null
+          comment?: string | null
+          created_at?: string | null
+          id?: number
+          is_approved?: boolean | null
+          order_id?: number | null
+          rating?: number | null
+          service_id?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          admin_response?: string | null
+          comment?: string | null
+          created_at?: string | null
+          id?: number
+          is_approved?: boolean | null
+          order_id?: number | null
+          rating?: number | null
+          service_id?: number | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reviews_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      services: {
+        Row: {
+          category_id: number | null
+          description: string | null
+          duration_minutes: number | null
+          id: number
+          image_url: string | null
+          name: string
+          price: number
+          rating: number | null
+          review_count: number | null
+        }
+        Insert: {
+          category_id?: number | null
+          description?: string | null
+          duration_minutes?: number | null
+          id?: number
+          image_url?: string | null
+          name: string
+          price: number
+          rating?: number | null
+          review_count?: number | null
+        }
+        Update: {
+          category_id?: number | null
+          description?: string | null
+          duration_minutes?: number | null
+          id?: number
+          image_url?: string | null
+          name?: string
+          price?: number
+          rating?: number | null
+          review_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "services_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
