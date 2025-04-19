@@ -47,7 +47,7 @@ const mockReviews = Array(12).fill(null).map((_, i) => ({
   createdAt: new Date(Date.now() - (i * 86400000 * 2)).toISOString(),
   isApproved: i < 10, // First 10 are approved
   hasAdminResponse: i < 5,
-  adminResponse: i < 5 ? 'Thank you for your feedback! We're glad you had a positive experience.' : ''
+  adminResponse: i < 5 ? "Thank you for your feedback! We're glad you had a positive experience." : ''
 }));
 
 const AdminReviewsPage = () => {
