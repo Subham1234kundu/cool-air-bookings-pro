@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -7,6 +8,11 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import ServicesPage from "./pages/ServicesPage";
 import CheckoutPage from "./pages/CheckoutPage";
+import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
+import AdminBookingsPage from "./pages/admin/AdminBookingsPage";
+import AdminServicesPage from "./pages/admin/AdminServicesPage";
+import AdminReviewsPage from "./pages/admin/AdminReviewsPage";
+import AdminLayout from "./components/admin/AdminLayout";
 import { CartProvider } from "./context/CartContext";
 
 const queryClient = new QueryClient();
@@ -22,6 +28,15 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/services" element={<ServicesPage />} />
             <Route path="/checkout" element={<CheckoutPage />} />
+            
+            {/* Admin Routes */}
+            <Route path="/admin" element={<AdminLayout />}>
+              <Route index element={<AdminDashboardPage />} />
+              <Route path="bookings" element={<AdminBookingsPage />} />
+              <Route path="services" element={<AdminServicesPage />} />
+              <Route path="reviews" element={<AdminReviewsPage />} />
+            </Route>
+            
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
