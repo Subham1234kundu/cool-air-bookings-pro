@@ -7,7 +7,7 @@ import { toast } from "@/components/ui/use-toast";
 
 // Types
 export type ServiceItem = {
-  id: string;
+  id: number;
   name: string;
   price: number;
   quantity: number;
@@ -18,8 +18,8 @@ export type ServiceItem = {
 type CartContextType = {
   items: ServiceItem[];
   addItem: (item: ServiceItem) => void;
-  removeItem: (id: string) => void;
-  updateQuantity: (id: string, quantity: number) => void;
+  removeItem: (id: number) => void;
+  updateQuantity: (id: number, quantity: number) => void;
   clearCart: () => void;
   isCartOpen: boolean;
   setIsCartOpen: (isOpen: boolean) => void;
@@ -42,7 +42,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   const addItemMutation = useMutation({
-    mutationFn: ({ serviceId, quantity }: { serviceId: string, quantity: number }) =>
+    mutationFn: ({ serviceId, quantity }: { serviceId: number, quantity: number }) =>
       addToCart(serviceId, quantity),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cart'] });
@@ -65,7 +65,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   const updateQuantityMutation = useMutation({
-    mutationFn: ({ serviceId, quantity }: { serviceId: string, quantity: number }) =>
+    mutationFn: ({ serviceId, quantity }: { serviceId: number, quantity: number }) =>
       updateCartQuantity(serviceId, quantity),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cart'] });
@@ -95,11 +95,11 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     addItemMutation.mutate({ serviceId: item.id, quantity: item.quantity });
   };
 
-  const removeItem = (id: string) => {
+  const removeItem = (id: number) => {
     removeItemMutation.mutate(id);
   };
 
-  const updateQuantity = (id: string, quantity: number) => {
+  const updateQuantity = (id: number, quantity: number) => {
     updateQuantityMutation.mutate({ serviceId: id, quantity });
   };
 

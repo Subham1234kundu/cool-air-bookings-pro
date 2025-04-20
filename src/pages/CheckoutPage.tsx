@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
@@ -23,11 +24,21 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
+import { RazorpayCheckout } from "@/components/checkout/RazorpayCheckout";
 
 const CheckoutPage = () => {
   const { items, updateQuantity, totalPrice } = useCart();
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<any>(null);
+  const [showPaymentGateway, setShowPaymentGateway] = useState(false);
+  const [formData, setFormData] = useState({
+    fullName: '',
+    phone: '',
+    email: '',
+    date: '',
+    timeSlot: ''
+  });
+  const [formComplete, setFormComplete] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -90,13 +101,60 @@ const CheckoutPage = () => {
 
   const onSubmitLocation = (formData: any) => {
     createLocationMutation.mutate({
-      user_id: supabase.auth.getUser().then(u => u.data.user?.id),
+      user_id: "",  // This will be set by the backend function
       address: formData.address,
       latitude: null,
       longitude: null,
-      is_default: locations?.length === 0
+      is_default: locations?.length === 0 ? true : false
     });
     reset();
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { id, value } = e.target;
+    setFormData(prev => ({ ...prev, [id]: value }));
+    
+    // Check if all required fields are filled
+    setTimeout(() => {
+      const { fullName, phone, email, date, timeSlot } = formData;
+      setFormComplete(
+        !!fullName && 
+        !!phone && 
+        !!email && 
+        !!date && 
+        !!timeSlot && 
+        !!selectedLocation
+      );
+    }, 100);
+  };
+
+  const handleProceedToPayment = () => {
+    if (!formComplete) {
+      toast({
+        title: "Incomplete Information",
+        description: "Please fill all required fields and select a location before proceeding.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setShowPaymentGateway(true);
+  };
+
+  const handlePaymentSuccess = (response: any) => {
+    toast({
+      title: "Payment Successful",
+      description: "Your booking has been confirmed. Thank you!",
+    });
+    // In a real app, you would create the order in the database here
+  };
+
+  const handlePaymentFailure = (error: any) => {
+    toast({
+      title: "Payment Failed",
+      description: error.message || "There was an issue processing your payment.",
+      variant: "destructive",
+    });
+    setShowPaymentGateway(false);
   };
 
   if (items.length === 0) {
@@ -137,47 +195,49 @@ const CheckoutPage = () => {
               </h2>
               
               {supabase.auth.getUser().then(u => u.data.user) ? (
-                locations?.length ? (
-                  <div>
-                    {locations.map((loc) => (
-                      <div 
-                        key={loc.id} 
-                        className={`p-4 border rounded-lg mb-2 cursor-pointer ${
-                          selectedLocation?.id === loc.id ? 'border-brand bg-brand/10' : ''
-                        }`}
-                        onClick={() => setSelectedLocation(loc)}
-                      >
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <MapPin className="inline mr-2 h-5 w-5 text-brand" />
-                            {loc.address}
-                            {loc.is_default && (
-                              <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                                Default
-                              </span>
+                <>
+                  {locations?.length ? (
+                    <div>
+                      {locations.map((loc) => (
+                        <div 
+                          key={loc.id} 
+                          className={`p-4 border rounded-lg mb-2 cursor-pointer ${
+                            selectedLocation?.id === loc.id ? 'border-brand bg-brand/10' : ''
+                          }`}
+                          onClick={() => setSelectedLocation(loc)}
+                        >
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <MapPin className="inline mr-2 h-5 w-5 text-brand" />
+                              {loc.address}
+                              {loc.is_default && (
+                                <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                                  Default
+                                </span>
+                              )}
+                            </div>
+                            {!loc.is_default && (
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDefaultLocationMutation.mutate(loc.id);
+                                }}
+                              >
+                                Set as Default
+                              </Button>
                             )}
                           </div>
-                          {!loc.is_default && (
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setDefaultLocationMutation.mutate(loc.id);
-                              }}
-                            >
-                              Set as Default
-                            </Button>
-                          )}
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center text-gray-600">
-                    No saved locations. Add a location to proceed.
-                  </div>
-                )
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center text-gray-600">
+                      No saved locations. Add a location to proceed.
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="text-center">
                   <p className="text-gray-600 mb-4">
@@ -195,28 +255,36 @@ const CheckoutPage = () => {
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="name">Full Name</Label>
-                    <Input id="name" placeholder="John Doe" className="mt-1" />
+                    <Label htmlFor="fullName">Full Name</Label>
+                    <Input 
+                      id="fullName" 
+                      placeholder="John Doe" 
+                      className="mt-1" 
+                      value={formData.fullName}
+                      onChange={handleInputChange}
+                    />
                   </div>
                   <div>
                     <Label htmlFor="phone">Phone Number</Label>
-                    <Input id="phone" placeholder="+91 12345 67890" className="mt-1" />
+                    <Input 
+                      id="phone" 
+                      placeholder="+91 12345 67890" 
+                      className="mt-1" 
+                      value={formData.phone}
+                      onChange={handleInputChange}
+                    />
                   </div>
                 </div>
                 <div>
                   <Label htmlFor="email">Email Address</Label>
-                  <Input id="email" placeholder="john@example.com" className="mt-1" />
+                  <Input 
+                    id="email" 
+                    placeholder="john@example.com" 
+                    className="mt-1" 
+                    value={formData.email}
+                    onChange={handleInputChange}
+                  />
                 </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-sm border p-6">
-              <h2 className="text-xl font-semibold mb-4">Service Address</h2>
-              <Button className="w-full bg-brand hover:bg-brand/90 mb-4">
-                Select an Address
-              </Button>
-              <div className="text-sm text-gray-600 text-center">
-                Google Maps integration will be added here
               </div>
             </div>
 
@@ -225,11 +293,22 @@ const CheckoutPage = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="date">Service Date</Label>
-                  <Input id="date" type="date" className="mt-1" />
+                  <Input 
+                    id="date" 
+                    type="date" 
+                    className="mt-1"
+                    value={formData.date}
+                    onChange={handleInputChange}
+                  />
                 </div>
                 <div>
-                  <Label htmlFor="time">Preferred Time</Label>
-                  <select id="time" className="w-full rounded-md border p-2 mt-1">
+                  <Label htmlFor="timeSlot">Preferred Time</Label>
+                  <select 
+                    id="timeSlot" 
+                    className="w-full rounded-md border p-2 mt-1"
+                    value={formData.timeSlot}
+                    onChange={handleInputChange}
+                  >
                     <option value="">Select a time slot</option>
                     <option value="morning">Morning (8 AM - 12 PM)</option>
                     <option value="afternoon">Afternoon (12 PM - 4 PM)</option>
@@ -291,7 +370,11 @@ const CheckoutPage = () => {
                 </div>
               </div>
               
-              <Button className="w-full bg-brand hover:bg-brand/90 mt-6">
+              <Button 
+                className="w-full bg-brand hover:bg-brand/90 mt-6"
+                disabled={!formComplete}
+                onClick={handleProceedToPayment}
+              >
                 Proceed to Payment
               </Button>
               
@@ -302,6 +385,19 @@ const CheckoutPage = () => {
           </div>
         </div>
       </div>
+
+      {showPaymentGateway && (
+        <RazorpayCheckout
+          amount={totalPrice + totalPrice * 0.1}
+          name={formData.fullName}
+          email={formData.email}
+          phone={formData.phone}
+          address={selectedLocation?.address}
+          orderId={1} // In a real app, you would create an order and get its ID
+          onSuccess={handlePaymentSuccess}
+          onFailure={handlePaymentFailure}
+        />
+      )}
 
       <Dialog open={isLocationModalOpen} onOpenChange={setIsLocationModalOpen}>
         <DialogContent>
@@ -322,8 +418,8 @@ const CheckoutPage = () => {
             </div>
             
             <DialogFooter>
-              <Button type="submit" disabled={createLocationMutation.isLoading}>
-                {createLocationMutation.isLoading ? 'Adding...' : 'Add Location'}
+              <Button type="submit" disabled={createLocationMutation.isPending}>
+                {createLocationMutation.isPending ? 'Adding...' : 'Add Location'}
               </Button>
             </DialogFooter>
           </form>

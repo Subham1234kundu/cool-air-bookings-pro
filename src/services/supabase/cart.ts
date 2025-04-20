@@ -18,7 +18,7 @@ export async function fetchUserCart() {
   return data;
 }
 
-export async function addToCart(serviceId: string, quantity: number) {
+export async function addToCart(serviceId: number, quantity: number) {
   const { data, error } = await supabase
     .from('cart_items')
     .upsert({
@@ -35,7 +35,7 @@ export async function addToCart(serviceId: string, quantity: number) {
   return data;
 }
 
-export async function removeFromCart(serviceId: string) {
+export async function removeFromCart(serviceId: number) {
   const { error } = await supabase
     .from('cart_items')
     .delete()
@@ -45,7 +45,7 @@ export async function removeFromCart(serviceId: string) {
   if (error) throw error;
 }
 
-export async function updateCartQuantity(serviceId: string, quantity: number) {
+export async function updateCartQuantity(serviceId: number, quantity: number) {
   const { data, error } = await supabase
     .from('cart_items')
     .update({ quantity })
