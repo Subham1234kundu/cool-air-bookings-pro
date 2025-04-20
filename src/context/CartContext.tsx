@@ -1,5 +1,9 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { fetchUserCart, addToCart, removeFromCart, updateCartQuantity } from "@/services/supabase/cart";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "@/components/ui/use-toast";
 
 // Types
 export type ServiceItem = {
@@ -21,80 +25,86 @@ type CartContextType = {
   setIsCartOpen: (isOpen: boolean) => void;
   totalItems: number;
   totalPrice: number;
+  isLoading: boolean;
 };
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [items, setItems] = useState<ServiceItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [totalItems, setTotalItems] = useState(0);
-  const [totalPrice, setTotalPrice] = useState(0);
+  const { session } = useAuth();
+  const queryClient = useQueryClient();
 
-  // Load cart from localStorage on initial load
-  useEffect(() => {
-    const savedCart = localStorage.getItem("cart");
-    if (savedCart) {
-      try {
-        const parsedCart = JSON.parse(savedCart);
-        setItems(parsedCart);
-      } catch (error) {
-        console.error("Error parsing saved cart", error);
-      }
-    }
-  }, []);
+  const { data: cartItems = [], isLoading } = useQuery({
+    queryKey: ['cart'],
+    queryFn: fetchUserCart,
+    enabled: !!session,
+  });
 
-  // Save cart to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem("cart", JSON.stringify(items));
-    
-    // Calculate totals
-    const itemCount = items.reduce((total, item) => total + item.quantity, 0);
-    const priceSum = items.reduce((total, item) => total + (item.price * item.quantity), 0);
-    
-    setTotalItems(itemCount);
-    setTotalPrice(priceSum);
-  }, [items]);
+  const addItemMutation = useMutation({
+    mutationFn: ({ serviceId, quantity }: { serviceId: string, quantity: number }) =>
+      addToCart(serviceId, quantity),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cart'] });
+      toast({
+        title: "Item added to cart",
+        description: "Your cart has been updated.",
+      });
+    },
+  });
 
-  // Add an item to cart
+  const removeItemMutation = useMutation({
+    mutationFn: removeFromCart,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cart'] });
+      toast({
+        title: "Item removed from cart",
+        description: "Your cart has been updated.",
+      });
+    },
+  });
+
+  const updateQuantityMutation = useMutation({
+    mutationFn: ({ serviceId, quantity }: { serviceId: string, quantity: number }) =>
+      updateCartQuantity(serviceId, quantity),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cart'] });
+    },
+  });
+
+  const items = cartItems.map(item => ({
+    id: item.service_id,
+    name: item.service.name,
+    price: item.service.price,
+    quantity: item.quantity,
+    image: item.service.image_url,
+  }));
+
+  const totalItems = items.reduce((total, item) => total + item.quantity, 0);
+  const totalPrice = items.reduce((total, item) => total + (item.price * item.quantity), 0);
+
   const addItem = (item: ServiceItem) => {
-    setItems(prevItems => {
-      const existingItem = prevItems.find(i => i.id === item.id);
-      
-      if (existingItem) {
-        // Increment quantity for existing items
-        return prevItems.map(i => 
-          i.id === item.id 
-            ? { ...i, quantity: i.quantity + (item.quantity || 1) }
-            : i
-        );
-      } else {
-        // Add new item with at least quantity 1
-        return [...prevItems, { ...item, quantity: item.quantity || 1 }];
-      }
-    });
-  };
-
-  // Remove an item from cart
-  const removeItem = (id: string) => {
-    setItems(items.filter(item => item.id !== id));
-  };
-
-  // Update quantity of an item
-  const updateQuantity = (id: string, quantity: number) => {
-    if (quantity <= 0) {
-      removeItem(id);
+    if (!session) {
+      toast({
+        title: "Please sign in",
+        description: "You need to be signed in to add items to cart.",
+        variant: "destructive",
+      });
       return;
     }
-    
-    setItems(items.map(item => 
-      item.id === id ? { ...item, quantity } : item
-    ));
+    addItemMutation.mutate({ serviceId: item.id, quantity: item.quantity });
   };
 
-  // Clear cart
+  const removeItem = (id: string) => {
+    removeItemMutation.mutate(id);
+  };
+
+  const updateQuantity = (id: string, quantity: number) => {
+    updateQuantityMutation.mutate({ serviceId: id, quantity });
+  };
+
   const clearCart = () => {
-    setItems([]);
+    items.forEach(item => removeItem(item.id));
   };
 
   return (
@@ -107,7 +117,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isCartOpen,
       setIsCartOpen,
       totalItems,
-      totalPrice
+      totalPrice,
+      isLoading,
     }}>
       {children}
     </CartContext.Provider>

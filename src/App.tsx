@@ -11,6 +11,7 @@ import AuthPage from "./pages/AuthPage";
 import NotFound from "./pages/NotFound";
 import ServicesPage from "./pages/ServicesPage";
 import CheckoutPage from "./pages/CheckoutPage";
+import MyBookingsPage from "./pages/MyBookingsPage";
 import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
 import AdminBookingsPage from "./pages/admin/AdminBookingsPage";
 import AdminServicesPage from "./pages/admin/AdminServicesPage";
@@ -32,6 +33,7 @@ const App = () => (
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/services" element={<ServicesPage />} />
               <Route path="/checkout" element={<CheckoutPage />} />
+              <Route path="/bookings" element={<MyBookingsPage />} />
               
               {/* Admin Routes */}
               <Route path="/admin" element={<AdminLayout />}>
