@@ -1,8 +1,9 @@
 
 import React from "react";
-import { Link } from "react-router-dom";
-import { MapPin, Search, ShoppingCart } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { MapPin, Search, ShoppingCart, LogIn } from "lucide-react";
 import { useCart } from "@/context/CartContext";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -11,9 +12,32 @@ import {
 } from "@/components/ui/sheet";
 import { CartSidebar } from "@/components/cart/CartSidebar";
 import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { supabase } from "@/integrations/supabase/client";
 
 export function Navbar() {
   const { totalItems } = useCart();
+  const { user, profile, isAdmin } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    navigate('/');
+  };
+
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase();
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-white">
@@ -59,9 +83,47 @@ export function Navbar() {
             <Link to="/bookings" className="text-gray-600 hover:text-skyblue transition-colors">
               My Bookings
             </Link>
-            <Link to="/login" className="text-gray-600 hover:text-skyblue transition-colors">
-              Login
-            </Link>
+            {isAdmin && (
+              <Link to="/admin" className="text-gray-600 hover:text-skyblue transition-colors">
+                Admin Dashboard
+              </Link>
+            )}
+            {!user ? (
+              <Link to="/auth" className="text-gray-600 hover:text-skyblue transition-colors">
+                <Button variant="ghost" size="sm">
+                  <LogIn className="mr-2 h-4 w-4" />
+                  Login
+                </Button>
+              </Link>
+            ) : (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback>
+                        {profile?.full_name ? getInitials(profile.full_name) : user.email?.[0].toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56" align="end">
+                  <DropdownMenuItem onClick={() => navigate('/profile')}>
+                    Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/bookings')}>
+                    My Bookings
+                  </DropdownMenuItem>
+                  {isAdmin && (
+                    <DropdownMenuItem onClick={() => navigate('/admin')}>
+                      Admin Dashboard
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onClick={handleSignOut}>
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </nav>
 
           {/* Cart Button - Show on all screen sizes */}
