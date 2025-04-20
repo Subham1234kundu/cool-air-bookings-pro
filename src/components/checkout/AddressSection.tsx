@@ -1,11 +1,12 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { MapPin, PlusCircle } from "lucide-react";
+import { MapPin, PlusCircle, Navigation } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchUserLocations, setDefaultLocation } from "@/services/supabase/locations";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { getCurrentLocation, saveUserLocation } from "@/utils/googleMapsUtils";
 
 interface AddressSectionProps {
   selectedLocation: any;
@@ -20,6 +21,7 @@ export const AddressSection = ({
 }: AddressSectionProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [isLocating, setIsLocating] = useState(false);
 
   const { data: locations, isLoading: locationsLoading } = useQuery({
     queryKey: ['userLocations'],
@@ -37,6 +39,30 @@ export const AddressSection = ({
       });
     }
   });
+
+  const handleGetCurrentLocation = async () => {
+    setIsLocating(true);
+    try {
+      const location = await getCurrentLocation();
+      const savedLocation = await saveUserLocation(location);
+      
+      queryClient.invalidateQueries({ queryKey: ['userLocations'] });
+      setSelectedLocation(savedLocation);
+      
+      toast({
+        title: "Location Detected",
+        description: location.formatted_address || "Current location saved",
+      });
+    } catch (error) {
+      toast({
+        title: "Location Error",
+        description: "Could not retrieve your current location",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLocating(false);
+    }
+  };
 
   const handleGoogleSignIn = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
@@ -59,13 +85,27 @@ export const AddressSection = ({
     <div className="bg-white rounded-lg shadow-sm border p-6">
       <h2 className="text-xl font-semibold mb-4 flex items-center justify-between">
         Service Address 
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={onAddLocation}
-        >
-          <PlusCircle className="mr-2 h-4 w-4" /> Add Location
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleGetCurrentLocation}
+            disabled={isLocating}
+          >
+            {isLocating ? 'Locating...' : (
+              <>
+                <Navigation className="mr-2 h-4 w-4" /> Current Location
+              </>
+            )}
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={onAddLocation}
+          >
+            <PlusCircle className="mr-2 h-4 w-4" /> Add Location
+          </Button>
+        </div>
       </h2>
       
       {supabase.auth.getUser().then(u => u.data.user) ? (
@@ -83,7 +123,7 @@ export const AddressSection = ({
                   <div className="flex justify-between items-center">
                     <div>
                       <MapPin className="inline mr-2 h-5 w-5 text-brand" />
-                      {loc.address}
+                      {loc.formatted_address || loc.address}
                       {loc.is_default && (
                         <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
                           Default
