@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Table, 
   TableBody, 
@@ -29,39 +29,73 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
 import { Calendar, Clock, MapPin, Search, User, Package } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
-// Mock data - replace with actual data fetching when connected to Supabase
-const mockBookings = Array(10).fill(null).map((_, i) => ({
-  id: `ORD-${1000 + i}`,
-  customerName: `Customer ${i + 1}`,
-  services: i % 3 === 0 ? ['AC Repair', 'Cleaning'] : i % 3 === 1 ? ['Installation'] : ['Maintenance'],
-  date: new Date(Date.now() + ((i - 5) * 86400000)).toISOString(), // -5 to +5 days from now
-  time: `${10 + (i % 8)}:00 ${(i % 8) < 2 ? 'AM' : 'PM'}`,
-  location: `Area ${i + 1}, City`,
-  status: i % 4 === 0 ? 'Pending' : i % 4 === 1 ? 'Confirmed' : i % 4 === 2 ? 'In Progress' : 'Completed',
-  total: 1500 + (i * 500),
-  address: `${100 + i} Main Street, Area ${i + 1}, City, 10000${i}`,
-  phone: `+91 9876543${100 + i}`,
-  email: `customer${i + 1}@example.com`,
-  payment: {
-    method: i % 2 === 0 ? 'Razorpay' : 'Cash',
-    status: i % 5 === 0 ? 'Pending' : 'Paid',
-    transactionId: i % 2 === 0 ? `TXN-${10000 + i}` : null
-  }
-}));
+const fetchAllBookings = async () => {
+  const { data, error } = await supabase
+    .from('orders')
+    .select(`
+      *,
+      order_items (*)
+    `)
+    .order('created_at', { ascending: false });
+  
+  if (error) throw error;
+  return data;
+};
+
+const updateBookingStatus = async ({ id, status }: { id: number, status: string }) => {
+  const { data, error } = await supabase
+    .from('orders')
+    .update({ status })
+    .eq('id', id)
+    .select()
+    .single();
+  
+  if (error) throw error;
+  return data;
+};
 
 const AdminBookingsPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedBooking, setSelectedBooking] = useState<null | any>(null);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const filteredBookings = mockBookings.filter(booking => {
+  const { data: bookings = [], isLoading, error } = useQuery({
+    queryKey: ['admin-bookings'],
+    queryFn: fetchAllBookings,
+    refetchInterval: 10000, // Refetch every 10 seconds for real-time updates
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: updateBookingStatus,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-bookings'] });
+      toast({
+        title: "Booking Updated",
+        description: "The booking status has been updated successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Update Failed",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const filteredBookings = bookings.filter((booking) => {
     const matchesSearch = 
-      booking.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      booking.customerName.toLowerCase().includes(searchTerm.toLowerCase());
+      booking.id.toString().includes(searchTerm.toLowerCase()) || 
+      booking.address?.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesStatus = statusFilter === 'all' || booking.status.toLowerCase() === statusFilter.toLowerCase();
+    const matchesStatus = statusFilter === 'all' || booking.status?.toLowerCase() === statusFilter.toLowerCase();
     
     return matchesSearch && matchesStatus;
   });
@@ -71,18 +105,27 @@ const AdminBookingsPage = () => {
   };
 
   const updateStatus = (newStatus: string) => {
-    // This would update the status in the database
-    // For now, we just update the local state
     if (selectedBooking) {
+      updateMutation.mutate({
+        id: selectedBooking.id,
+        status: newStatus
+      });
+      
+      // Update local state for immediate UI feedback
       setSelectedBooking({
         ...selectedBooking,
         status: newStatus
       });
-      
-      // In a real implementation, we would call an API or Supabase function
-      console.log(`Status updated to ${newStatus} for booking ${selectedBooking.id}`);
     }
   };
+
+  if (isLoading) {
+    return <div className="flex justify-center items-center h-64">Loading bookings...</div>;
+  }
+
+  if (error) {
+    return <div className="text-red-500">Error loading bookings: {error instanceof Error ? error.message : "Unknown error"}</div>;
+  }
 
   return (
     <>
@@ -122,36 +165,40 @@ const AdminBookingsPage = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>Order ID</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Services</TableHead>
+                <TableHead>Address</TableHead>
                 <TableHead>Date & Time</TableHead>
-                <TableHead>Location</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Payment</TableHead>
                 <TableHead>Total</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredBookings.map((booking) => (
+              {filteredBookings.map((booking: any) => (
                 <TableRow key={booking.id}>
                   <TableCell className="font-medium">{booking.id}</TableCell>
-                  <TableCell>{booking.customerName}</TableCell>
-                  <TableCell>{booking.services.join(', ')}</TableCell>
+                  <TableCell>{booking.address || "No address"}</TableCell>
                   <TableCell>
-                    {new Date(booking.date).toLocaleDateString()} - {booking.time}
+                    {new Date(booking.scheduled_at).toLocaleDateString()} - {new Date(booking.scheduled_at).toLocaleTimeString()}
                   </TableCell>
-                  <TableCell>{booking.location}</TableCell>
                   <TableCell>
                     <div className={`px-2 py-1 rounded-full text-xs inline-flex items-center font-medium
-                      ${booking.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' : ''}
-                      ${booking.status === 'Confirmed' ? 'bg-blue-100 text-blue-800' : ''}
-                      ${booking.status === 'In Progress' ? 'bg-purple-100 text-purple-800' : ''}
-                      ${booking.status === 'Completed' ? 'bg-green-100 text-green-800' : ''}
+                      ${booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : ''}
+                      ${booking.status === 'confirmed' ? 'bg-blue-100 text-blue-800' : ''}
+                      ${booking.status === 'in progress' ? 'bg-purple-100 text-purple-800' : ''}
+                      ${booking.status === 'completed' ? 'bg-green-100 text-green-800' : ''}
                     `}>
-                      {booking.status}
+                      {booking.status || "Pending"}
                     </div>
                   </TableCell>
-                  <TableCell>₹{booking.total.toFixed(2)}</TableCell>
+                  <TableCell>
+                    <div className={`px-2 py-1 rounded-full text-xs inline-flex items-center font-medium
+                      ${booking.payment_status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}
+                    `}>
+                      {booking.payment_status || "Unknown"}
+                    </div>
+                  </TableCell>
+                  <TableCell>₹{booking.total_amount?.toFixed(2) || "0.00"}</TableCell>
                   <TableCell>
                     <Button 
                       variant="outline" 
@@ -180,7 +227,7 @@ const AdminBookingsPage = () => {
         <Dialog open={!!selectedBooking} onOpenChange={() => setSelectedBooking(null)}>
           <DialogContent className="max-w-3xl">
             <DialogHeader>
-              <DialogTitle>Booking Details - {selectedBooking.id}</DialogTitle>
+              <DialogTitle>Booking Details - Order #{selectedBooking.id}</DialogTitle>
               <DialogDescription>
                 View and manage booking details
               </DialogDescription>
@@ -194,16 +241,17 @@ const AdminBookingsPage = () => {
                   </h3>
                   <div className="grid gap-1 mt-2">
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Name:</span>
-                      <span className="font-medium">{selectedBooking.customerName}</span>
+                      <span className="text-muted-foreground">User ID:</span>
+                      <span className="font-medium">{selectedBooking.user_id}</span>
+                    </div>
+                    {/* We'll pull contact info from database when fetching bookings */}
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Email:</span>
+                      <span className="font-medium">{selectedBooking.email || "Not available"}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Phone:</span>
-                      <span className="font-medium">{selectedBooking.phone}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Email:</span>
-                      <span className="font-medium">{selectedBooking.email}</span>
+                      <span className="font-medium">{selectedBooking.phone || "Not available"}</span>
                     </div>
                   </div>
                 </div>
@@ -215,15 +263,23 @@ const AdminBookingsPage = () => {
                   <div className="grid gap-1 mt-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Date:</span>
-                      <span className="font-medium">{new Date(selectedBooking.date).toLocaleDateString()}</span>
+                      <span className="font-medium">
+                        {selectedBooking.scheduled_at 
+                          ? new Date(selectedBooking.scheduled_at).toLocaleDateString() 
+                          : "Not scheduled"}
+                      </span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Time:</span>
-                      <span className="font-medium">{selectedBooking.time}</span>
+                      <span className="font-medium">
+                        {selectedBooking.scheduled_at 
+                          ? new Date(selectedBooking.scheduled_at).toLocaleTimeString() 
+                          : "Not scheduled"}
+                      </span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Status:</span>
-                      <span className="font-medium">{selectedBooking.status}</span>
+                      <span className="font-medium">{selectedBooking.status || "Pending"}</span>
                     </div>
                   </div>
                 </div>
@@ -233,15 +289,15 @@ const AdminBookingsPage = () => {
                     <Package className="h-5 w-5" /> Services
                   </h3>
                   <div className="mt-2 space-y-2">
-                    {selectedBooking.services.map((service: string, index: number) => (
+                    {selectedBooking.order_items && selectedBooking.order_items.map((item: any, index: number) => (
                       <div key={index} className="flex justify-between text-sm">
-                        <span>{service}</span>
-                        <span className="font-medium">₹{(selectedBooking.total / selectedBooking.services.length).toFixed(2)}</span>
+                        <span>{item.service_name}</span>
+                        <span className="font-medium">₹{item.unit_price.toFixed(2)} x {item.quantity}</span>
                       </div>
                     ))}
                     <div className="flex justify-between text-sm font-semibold border-t pt-2">
                       <span>Total:</span>
-                      <span>₹{selectedBooking.total.toFixed(2)}</span>
+                      <span>₹{selectedBooking.total_amount?.toFixed(2) || "0.00"}</span>
                     </div>
                   </div>
                 </div>
@@ -250,19 +306,15 @@ const AdminBookingsPage = () => {
                   <h3 className="text-lg font-medium">Payment Information</h3>
                   <div className="grid gap-1 mt-2">
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Method:</span>
-                      <span className="font-medium">{selectedBooking.payment.method}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Status:</span>
-                      <span className={`font-medium ${selectedBooking.payment.status === 'Paid' ? 'text-green-600' : 'text-yellow-600'}`}>
-                        {selectedBooking.payment.status}
+                      <span className={`font-medium ${selectedBooking.payment_status === 'paid' ? 'text-green-600' : 'text-yellow-600'}`}>
+                        {selectedBooking.payment_status || "Unpaid"}
                       </span>
                     </div>
-                    {selectedBooking.payment.transactionId && (
+                    {selectedBooking.payment_id && (
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Transaction ID:</span>
-                        <span className="font-medium">{selectedBooking.payment.transactionId}</span>
+                        <span className="font-medium">{selectedBooking.payment_id}</span>
                       </div>
                     )}
                   </div>
@@ -274,48 +326,54 @@ const AdminBookingsPage = () => {
                   <h3 className="text-lg font-medium flex items-center gap-2">
                     <MapPin className="h-5 w-5" /> Service Address
                   </h3>
-                  <p className="text-sm mt-1">{selectedBooking.address}</p>
+                  <p className="text-sm mt-1">{selectedBooking.address || "No address provided"}</p>
                   
                   {/* Map placeholder - replace with actual Google Map in production */}
                   <div className="mt-2 border rounded-md bg-slate-100 h-48 flex items-center justify-center">
-                    <p className="text-muted-foreground text-sm">Google Map would be displayed here</p>
+                    {selectedBooking.latitude && selectedBooking.longitude ? (
+                      <p className="text-muted-foreground text-sm">
+                        Location: {selectedBooking.latitude}, {selectedBooking.longitude}
+                      </p>
+                    ) : (
+                      <p className="text-muted-foreground text-sm">No location coordinates available</p>
+                    )}
                   </div>
                 </div>
                 
                 <div>
                   <h3 className="text-lg font-medium">Update Status</h3>
                   <div className="flex flex-col gap-2 mt-2">
-                    <p className="text-sm text-muted-foreground">Current status: <span className="font-medium">{selectedBooking.status}</span></p>
+                    <p className="text-sm text-muted-foreground">Current status: <span className="font-medium">{selectedBooking.status || "Pending"}</span></p>
                     <div className="grid grid-cols-2 gap-2">
                       <Button
-                        variant={selectedBooking.status === 'Pending' ? 'default' : 'outline'}
+                        variant={selectedBooking.status === 'pending' ? 'default' : 'outline'}
                         size="sm"
-                        onClick={() => updateStatus('Pending')}
-                        disabled={selectedBooking.status === 'Pending'}
+                        onClick={() => updateStatus('pending')}
+                        disabled={selectedBooking.status === 'pending'}
                       >
                         Pending
                       </Button>
                       <Button
-                        variant={selectedBooking.status === 'Confirmed' ? 'default' : 'outline'}
+                        variant={selectedBooking.status === 'confirmed' ? 'default' : 'outline'}
                         size="sm"
-                        onClick={() => updateStatus('Confirmed')}
-                        disabled={selectedBooking.status === 'Confirmed'}
+                        onClick={() => updateStatus('confirmed')}
+                        disabled={selectedBooking.status === 'confirmed'}
                       >
                         Confirmed
                       </Button>
                       <Button
-                        variant={selectedBooking.status === 'In Progress' ? 'default' : 'outline'}
+                        variant={selectedBooking.status === 'in progress' ? 'default' : 'outline'}
                         size="sm"
-                        onClick={() => updateStatus('In Progress')}
-                        disabled={selectedBooking.status === 'In Progress'}
+                        onClick={() => updateStatus('in progress')}
+                        disabled={selectedBooking.status === 'in progress'}
                       >
                         In Progress
                       </Button>
                       <Button
-                        variant={selectedBooking.status === 'Completed' ? 'default' : 'outline'}
+                        variant={selectedBooking.status === 'completed' ? 'default' : 'outline'}
                         size="sm"
-                        onClick={() => updateStatus('Completed')}
-                        disabled={selectedBooking.status === 'Completed'}
+                        onClick={() => updateStatus('completed')}
+                        disabled={selectedBooking.status === 'completed'}
                       >
                         Completed
                       </Button>

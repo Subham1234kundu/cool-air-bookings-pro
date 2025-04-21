@@ -21,7 +21,12 @@ export async function createBooking(bookingData: {
     service_name: string
   }>,
   totalAmount: number,
-  address: string
+  address: string,
+  contactInfo?: {
+    fullName: string,
+    email: string,
+    phone: string
+  }
 }) {
   const { data: userData } = await supabase.auth.getUser();
   
@@ -34,7 +39,11 @@ export async function createBooking(bookingData: {
       total_amount: bookingData.totalAmount,
       status: 'pending',
       payment_status: 'unpaid',
-      address: bookingData.address
+      address: bookingData.address,
+      // Store contact information
+      fullName: bookingData.contactInfo?.fullName,
+      email: bookingData.contactInfo?.email,
+      phone: bookingData.contactInfo?.phone
     })
     .select()
     .single();

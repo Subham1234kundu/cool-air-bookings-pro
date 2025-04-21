@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { useCart } from "@/context/CartContext";
@@ -7,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createUserLocation } from "@/services/supabase/locations";
 import { useToast } from "@/hooks/use-toast";
-import { RazorpayCheckout } from "@/components/checkout/RazorpayCheckout";
+import RazorpayCheckout from "@/components/checkout/RazorpayCheckout";
 import { AddressSection } from "@/components/checkout/AddressSection";
 import { ContactSection } from "@/components/checkout/ContactSection";
 import { DateTimeSection } from "@/components/checkout/DateTimeSection";
@@ -34,7 +33,6 @@ const CheckoutPage = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  // Effect to check if form is complete whenever form data or selected location changes
   useEffect(() => {
     const { fullName, phone, email, date, timeSlot } = formData;
     const isComplete =
@@ -71,7 +69,7 @@ const CheckoutPage = () => {
   const createBookingMutation = useMutation({
     mutationFn: createBooking,
     onSuccess: (createdOrder) => {
-      // Store the created order ID to use in payment process
+      console.log("Order created successfully:", createdOrder);
       setCurrentOrderId(createdOrder.id);
       setShowPaymentGateway(true);
 
@@ -105,9 +103,7 @@ const CheckoutPage = () => {
       return;
     }
     
-    // First create the booking/order
     try {
-      // Map cart items to services
       const orderItems = items.map(item => ({
         service_id: item.id,
         quantity: item.quantity,
@@ -115,9 +111,15 @@ const CheckoutPage = () => {
         service_name: item.name
       }));
 
-      // Compose scheduled datetime in ISO string
-      const scheduledAt = formData.date && formData.timeSlot
-        ? new Date(`${formData.date}T${formData.timeSlot}`).toISOString()
+      const timeMap: { [key: string]: string } = {
+        'morning': '10:00',
+        'afternoon': '14:00',
+        'evening': '18:00'
+      };
+      
+      const timeValue = timeMap[formData.timeSlot] || '12:00';
+      const scheduledAt = formData.date 
+        ? `${formData.date}T${timeValue}:00` 
         : new Date().toISOString();
 
       createBookingMutation.mutate({
@@ -125,7 +127,12 @@ const CheckoutPage = () => {
         scheduledAt,
         items: orderItems,
         totalAmount: totalPrice + totalPrice * 0.1,
-        address: selectedLocation?.address
+        address: selectedLocation?.address,
+        contactInfo: {
+          fullName: formData.fullName,
+          email: formData.email,
+          phone: formData.phone
+        }
       });
     } catch (error: any) {
       toast({
@@ -138,12 +145,16 @@ const CheckoutPage = () => {
 
   const handlePaymentSuccess = async (response: any) => {
     try {
-      // Update the existing order/booking payment status
+      console.log("Payment success response:", response);
+      
       const { error } = await supabase
         .from('orders')
         .update({
           payment_status: 'paid',
-          payment_id: response.razorpay_payment_id
+          payment_id: response.razorpay_payment_id,
+          email: formData.email,
+          phone: formData.phone,
+          fullName: formData.fullName
         })
         .eq('id', currentOrderId);
 
@@ -157,6 +168,7 @@ const CheckoutPage = () => {
       clearCart();
       navigate("/bookings");
     } catch (error: any) {
+      console.error("Payment update error:", error);
       toast({
         title: "Payment Update Error",
         description: error?.message || "Payment was successful, but updating booking failed. Please contact support.",
@@ -167,6 +179,7 @@ const CheckoutPage = () => {
   };
 
   const handlePaymentFailure = (error: any) => {
+    console.error("Payment failure:", error);
     toast({
       title: "Payment Failed",
       description: error.message || "There was an issue processing your payment.",

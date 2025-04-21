@@ -58,28 +58,73 @@ export const RazorpayCheckout = ({
   
   const paymentMutation = useMutation({
     mutationFn: createPayment,
-    onSettled: (data, error) => {
-      if (error) {
-        console.error("Payment initialization error:", error);
-        toast({
-          title: 'Payment initialization failed',
-          description: 'Failed to initialize payment. Please try again.',
-          variant: 'destructive',
-        });
-        onFailure(error);
-      }
+    onSuccess: (data) => {
+      console.log("Payment initialized successfully:", data);
+      // After payment is initialized, open Razorpay
+      openRazorpayCheckout(data);
+    },
+    onError: (error) => {
+      console.error("Payment initialization error:", error);
+      toast({
+        title: 'Payment initialization failed',
+        description: 'Failed to initialize payment. Please try again.',
+        variant: 'destructive',
+      });
+      onFailure(error);
     }
   });
 
+  const openRazorpayCheckout = (paymentData: any) => {
+    const options = {
+      key: 'rzp_test_your_key_here', // Replace with your actual Razorpay key
+      amount: amount * 100, // Amount in paise
+      currency: 'INR',
+      name: 'Cool Air Service',
+      description: `Payment for service order #${orderId}`,
+      order_id: paymentData.id.toString(),
+      handler: function(response: any) {
+        toast({
+          title: 'Payment Successful',
+          description: 'Your payment was processed successfully',
+        });
+        onSuccess(response);
+      },
+      prefill: {
+        name,
+        email,
+        contact: phone,
+      },
+      notes: {
+        address: address
+      },
+      theme: {
+        color: '#3399cc',
+      },
+      modal: {
+        ondismiss: function() {
+          toast({
+            title: 'Payment Cancelled',
+            description: 'You cancelled the payment process',
+            variant: 'destructive',
+          });
+          onFailure(new Error('Payment process cancelled'));
+        }
+      }
+    };
+
+    const razorpay = new window.Razorpay(options);
+    razorpay.open();
+  };
+
   useEffect(() => {
     const initializePayment = async () => {
+      console.log("Initializing payment with order ID:", orderId);
       const isScriptLoaded = await loadRazorpayScript();
       
       if (isScriptLoaded) {
-        try {
-          console.log("Creating payment with orderId:", orderId);
-          
-          const paymentData = await paymentMutation.mutateAsync({
+        try {          
+          console.log("Creating payment with amount:", amount);
+          paymentMutation.mutate({
             orderId,
             amount: amount * 100, // Razorpay takes amount in paise
             currency: 'INR',
@@ -91,48 +136,8 @@ export const RazorpayCheckout = ({
             }
           });
           
-          const options = {
-            key: 'rzp_test_your_key_here', // Replace with your actual Razorpay key
-            amount: amount * 100, // Amount in paise
-            currency: 'INR',
-            name: 'Cool Air Service',
-            description: `Payment for service order #${orderId}`,
-            order_id: paymentData.id.toString(),
-            handler: function(response: any) {
-              toast({
-                title: 'Payment Successful',
-                description: 'Your payment was processed successfully',
-              });
-              onSuccess(response);
-            },
-            prefill: {
-              name,
-              email,
-              contact: phone,
-            },
-            notes: {
-              address: address
-            },
-            theme: {
-              color: '#3399cc',
-            },
-            modal: {
-              ondismiss: function() {
-                toast({
-                  title: 'Payment Cancelled',
-                  description: 'You cancelled the payment process',
-                  variant: 'destructive',
-                });
-                onFailure(new Error('Payment process cancelled'));
-              }
-            }
-          };
-
-          const razorpay = new window.Razorpay(options);
-          razorpay.open();
-          
         } catch (error) {
-          console.error("Payment initialization error:", error);
+          console.error("Payment script loading error:", error);
           toast({
             title: 'Payment Error',
             description: 'An error occurred while initializing payment',
@@ -151,7 +156,9 @@ export const RazorpayCheckout = ({
     };
 
     initializePayment();
-  }, [amount, name, email, phone, address, orderId, onSuccess, onFailure, paymentMutation, navigate, toast]);
+  }, []);
 
   return null;
 };
+
+export default RazorpayCheckout;

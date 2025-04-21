@@ -36,12 +36,12 @@ export async function createPayment(paymentDetails: PaymentDetails) {
   return data;
 }
 
-export async function updatePaymentStatus(paymentId: string, status: string, paymentDetails: any) {
+export async function updatePaymentStatus(paymentId: number, status: string, paymentDetails: any) {
   const { data, error } = await supabase
     .from('payments')
     .update({ 
       payment_status: status,
-      payment_id: paymentId,
+      payment_id: paymentDetails?.razorpay_payment_id || null,
       payment_details: paymentDetails
     })
     .eq('id', paymentId)
