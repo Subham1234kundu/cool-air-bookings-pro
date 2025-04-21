@@ -14,8 +14,8 @@ interface AddressSectionProps {
   onAddLocation: () => void;
 }
 
-export const AddressSection = ({ 
-  selectedLocation, 
+export const AddressSection = ({
+  selectedLocation,
   setSelectedLocation,
   onAddLocation
 }: AddressSectionProps) => {
@@ -44,14 +44,18 @@ export const AddressSection = ({
     setIsLocating(true);
     try {
       const location = await getCurrentLocation();
-      const savedLocation = await saveUserLocation(location);
-      
+      const savedLocation = await saveUserLocation({
+        latitude: location.latitude,
+        longitude: location.longitude,
+        address: location.address || ''
+      });
+
       queryClient.invalidateQueries({ queryKey: ['userLocations'] });
       setSelectedLocation(savedLocation);
-      
+
       toast({
         title: "Location Detected",
-        description: location.formatted_address || "Current location saved",
+        description: location.address || "Current location saved",
       });
     } catch (error) {
       toast({
@@ -84,11 +88,11 @@ export const AddressSection = ({
   return (
     <div className="bg-white rounded-lg shadow-sm border p-6">
       <h2 className="text-xl font-semibold mb-4 flex items-center justify-between">
-        Service Address 
+        Service Address
         <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             onClick={handleGetCurrentLocation}
             disabled={isLocating}
           >
@@ -98,23 +102,23 @@ export const AddressSection = ({
               </>
             )}
           </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             onClick={onAddLocation}
           >
             <PlusCircle className="mr-2 h-4 w-4" /> Add Location
           </Button>
         </div>
       </h2>
-      
+
       {supabase.auth.getUser().then(u => u.data.user) ? (
         <>
           {locations?.length ? (
             <div>
               {locations.map((loc) => (
-                <div 
-                  key={loc.id} 
+                <div
+                  key={loc.id}
                   className={`p-4 border rounded-lg mb-2 cursor-pointer ${
                     selectedLocation?.id === loc.id ? 'border-brand bg-brand/10' : ''
                   }`}
@@ -123,7 +127,7 @@ export const AddressSection = ({
                   <div className="flex justify-between items-center">
                     <div>
                       <MapPin className="inline mr-2 h-5 w-5 text-brand" />
-                      {loc.formatted_address || loc.address}
+                      {loc.address}
                       {loc.is_default && (
                         <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
                           Default
@@ -131,8 +135,8 @@ export const AddressSection = ({
                       )}
                     </div>
                     {!loc.is_default && (
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
