@@ -8,7 +8,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 const CartSidebar = () => {
-  const { items, totalPrice, updateQuantity, removeFromCart } = useCart();
+  const { items, totalPrice, updateQuantity, removeItem } = useCart();
   const navigate = useNavigate();
   
   const handleUpdateQuantity = (id: number, quantity: number) => {
@@ -87,7 +87,7 @@ const CartSidebar = () => {
                           ₹{(item.price * item.quantity).toFixed(0)}
                         </span>
                         <button
-                          onClick={() => removeFromCart(item.id)}
+                          onClick={() => removeItem(item.id)}
                           className="text-xs text-red-600 mt-1"
                         >
                           Remove

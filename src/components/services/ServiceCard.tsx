@@ -24,12 +24,12 @@ export const ServiceCard = ({
   rating = 0,
   review_count = 0,
 }: ServiceCardProps) => {
-  const { addToCart, items } = useCart();
+  const { addItem, items } = useCart();
   
   const isInCart = items.some(item => item.id === id);
   
   const handleAddToCart = () => {
-    addToCart({
+    addItem({
       id,
       name,
       price,

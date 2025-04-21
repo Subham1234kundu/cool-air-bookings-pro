@@ -10,7 +10,7 @@ import {
   SheetContent,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { CartSidebar } from "@/components/cart/CartSidebar";
+import CartSidebar from "@/components/cart/CartSidebar";
 import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,

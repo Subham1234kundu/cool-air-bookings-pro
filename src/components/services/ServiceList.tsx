@@ -36,7 +36,16 @@ export const ServiceList: React.FC<ServiceListProps> = ({ services, category, ti
       ) : (
         <div className="grid grid-cols-1 gap-4">
           {filteredServices.map((service) => (
-            <ServiceCard key={service.id} service={service} />
+            <ServiceCard
+              key={service.id}
+              id={parseInt(service.id)}
+              name={service.name}
+              price={service.price}
+              description={service.description}
+              image={service.image}
+              rating={service.rating}
+              review_count={service.reviews}
+            />
           ))}
         </div>
       )}
