@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { useCart } from "@/context/CartContext";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createUserLocation } from "@/services/supabase/locations";
@@ -14,9 +14,10 @@ import { DateTimeSection } from "@/components/checkout/DateTimeSection";
 import { OrderSummary } from "@/components/checkout/OrderSummary";
 import { AddLocationDialog } from "@/components/checkout/AddLocationDialog";
 import { supabase } from "@/integrations/supabase/client";
+import { createBooking } from "@/services/supabase/bookings";
 
 const CheckoutPage = () => {
-  const { items, updateQuantity, totalPrice } = useCart();
+  const { items, updateQuantity, totalPrice, clearCart } = useCart();
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<any>(null);
   const [showPaymentGateway, setShowPaymentGateway] = useState(false);
@@ -30,18 +31,19 @@ const CheckoutPage = () => {
   const [formComplete, setFormComplete] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   // Effect to check if form is complete whenever form data or selected location changes
   useEffect(() => {
     const { fullName, phone, email, date, timeSlot } = formData;
-    const isComplete = 
-      !!fullName && 
-      !!phone && 
-      !!email && 
-      !!date && 
-      !!timeSlot && 
+    const isComplete =
+      !!fullName &&
+      !!phone &&
+      !!email &&
+      !!date &&
+      !!timeSlot &&
       !!selectedLocation;
-    
+
     setFormComplete(isComplete);
   }, [formData, selectedLocation]);
 
@@ -65,6 +67,25 @@ const CheckoutPage = () => {
     }
   });
 
+  const createBookingMutation = useMutation({
+    mutationFn: createBooking,
+    onSuccess: () => {
+      toast({
+        title: "Booking Confirmed",
+        description: "Your booking has been saved.",
+      });
+      clearCart();
+      navigate("/bookings");
+    },
+    onError: () => {
+      toast({
+        title: "Booking Error",
+        description: "Failed to create booking in database, please contact support.",
+        variant: "destructive",
+      });
+    }
+  });
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { id, value } = e.target;
     setFormData(prev => ({ ...prev, [id]: value }));
@@ -82,11 +103,42 @@ const CheckoutPage = () => {
     setShowPaymentGateway(true);
   };
 
-  const handlePaymentSuccess = (response: any) => {
-    toast({
-      title: "Payment Successful",
-      description: "Your booking has been confirmed. Thank you!",
-    });
+  const handlePaymentSuccess = async (response: any) => {
+    // After payment, create booking in Supabase
+    try {
+      // Find or create mapping of cart items to services
+      const orderItems = items.map(item => ({
+        service_id: item.id,
+        quantity: item.quantity,
+        unit_price: item.price,
+        service_name: item.name
+      }));
+
+      // Compose scheduled datetime in ISO string
+      const scheduledAt = formData.date && formData.timeSlot
+        ? new Date(`${formData.date}T${formData.timeSlot}`).toISOString()
+        : new Date().toISOString();
+
+      createBookingMutation.mutate({
+        locationId: selectedLocation?.id,
+        scheduledAt,
+        items: orderItems,
+        totalAmount: totalPrice + totalPrice * 0.1,
+        address: selectedLocation?.address
+      });
+
+      toast({
+        title: "Payment Successful",
+        description: "Your booking has been confirmed. Thank you!",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Booking Error",
+        description: error?.message || "Payment was successful, but booking creation failed. Please contact support.",
+        variant: "destructive",
+      });
+    }
+    setShowPaymentGateway(false);
   };
 
   const handlePaymentFailure = (error: any) => {
@@ -120,28 +172,28 @@ const CheckoutPage = () => {
     <Layout>
       <div className="container mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold mb-8">Checkout</h1>
-        
+
         <div className="flex flex-col lg:flex-row gap-8">
           <div className="lg:w-8/12 space-y-6">
-            <AddressSection 
+            <AddressSection
               selectedLocation={selectedLocation}
               setSelectedLocation={setSelectedLocation}
               onAddLocation={() => setIsLocationModalOpen(true)}
             />
 
-            <ContactSection 
+            <ContactSection
               formData={formData}
               onChange={handleInputChange}
             />
 
-            <DateTimeSection 
+            <DateTimeSection
               formData={formData}
               onChange={handleInputChange}
             />
           </div>
 
           <div className="lg:w-4/12">
-            <OrderSummary 
+            <OrderSummary
               items={items}
               updateQuantity={updateQuantity}
               totalPrice={totalPrice}
@@ -152,7 +204,7 @@ const CheckoutPage = () => {
         </div>
       </div>
 
-      <AddLocationDialog 
+      <AddLocationDialog
         isOpen={isLocationModalOpen}
         onOpenChange={setIsLocationModalOpen}
         onSubmit={(data) => {
@@ -184,3 +236,4 @@ const CheckoutPage = () => {
 };
 
 export default CheckoutPage;
+
