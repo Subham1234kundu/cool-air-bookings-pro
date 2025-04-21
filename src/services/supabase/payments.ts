@@ -2,7 +2,7 @@
 import { supabase } from "@/integrations/supabase/client";
 
 export type PaymentDetails = {
-  orderId: number;
+  orderId: number | null;
   amount: number;
   currency: string;
   notes: {

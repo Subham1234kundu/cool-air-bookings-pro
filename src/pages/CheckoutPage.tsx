@@ -21,6 +21,7 @@ const CheckoutPage = () => {
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<any>(null);
   const [showPaymentGateway, setShowPaymentGateway] = useState(false);
+  const [currentOrderId, setCurrentOrderId] = useState<number | null>(null);
   const [formData, setFormData] = useState({
     fullName: '',
     phone: '',
@@ -69,18 +70,21 @@ const CheckoutPage = () => {
 
   const createBookingMutation = useMutation({
     mutationFn: createBooking,
-    onSuccess: () => {
+    onSuccess: (createdOrder) => {
+      // Store the created order ID to use in payment process
+      setCurrentOrderId(createdOrder.id);
+      setShowPaymentGateway(true);
+
       toast({
-        title: "Booking Confirmed",
-        description: "Your booking has been saved.",
+        title: "Booking Created",
+        description: "Proceeding to payment...",
       });
-      clearCart();
-      navigate("/bookings");
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Booking creation error:", error);
       toast({
         title: "Booking Error",
-        description: "Failed to create booking in database, please contact support.",
+        description: "Failed to create booking in database, please try again.",
         variant: "destructive",
       });
     }
@@ -100,13 +104,10 @@ const CheckoutPage = () => {
       });
       return;
     }
-    setShowPaymentGateway(true);
-  };
-
-  const handlePaymentSuccess = async (response: any) => {
-    // After payment, create booking in Supabase
+    
+    // First create the booking/order
     try {
-      // Find or create mapping of cart items to services
+      // Map cart items to services
       const orderItems = items.map(item => ({
         service_id: item.id,
         quantity: item.quantity,
@@ -126,15 +127,39 @@ const CheckoutPage = () => {
         totalAmount: totalPrice + totalPrice * 0.1,
         address: selectedLocation?.address
       });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.message || "Could not process your request. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handlePaymentSuccess = async (response: any) => {
+    try {
+      // Update the existing order/booking payment status
+      const { error } = await supabase
+        .from('orders')
+        .update({
+          payment_status: 'paid',
+          payment_id: response.razorpay_payment_id
+        })
+        .eq('id', currentOrderId);
+
+      if (error) throw error;
 
       toast({
         title: "Payment Successful",
         description: "Your booking has been confirmed. Thank you!",
       });
+      
+      clearCart();
+      navigate("/bookings");
     } catch (error: any) {
       toast({
-        title: "Booking Error",
-        description: error?.message || "Payment was successful, but booking creation failed. Please contact support.",
+        title: "Payment Update Error",
+        description: error?.message || "Payment was successful, but updating booking failed. Please contact support.",
         variant: "destructive",
       });
     }
@@ -219,14 +244,14 @@ const CheckoutPage = () => {
         isLoading={createLocationMutation.isPending}
       />
 
-      {showPaymentGateway && (
+      {showPaymentGateway && currentOrderId && (
         <RazorpayCheckout
           amount={totalPrice + totalPrice * 0.1}
           name={formData.fullName}
           email={formData.email}
           phone={formData.phone}
           address={selectedLocation?.address}
-          orderId={1}
+          orderId={currentOrderId}
           onSuccess={handlePaymentSuccess}
           onFailure={handlePaymentFailure}
         />
@@ -236,4 +261,3 @@ const CheckoutPage = () => {
 };
 
 export default CheckoutPage;
-

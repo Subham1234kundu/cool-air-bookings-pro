@@ -1,77 +1,75 @@
 
-import React from "react";
-import { Clock, Star } from "lucide-react";
+import React from 'react';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useCart } from "@/context/CartContext";
-import { ServiceItem } from "@/context/CartContext";
+import { Star } from "lucide-react";
+import { useCart } from '@/context/CartContext';
 
 interface ServiceCardProps {
-  service: {
-    id: string;
-    name: string;
-    price: number;
-    duration: string;
-    rating: number;
-    reviews: number;
-    image: string;
-    description?: string;
-  };
+  id: number;
+  name: string;
+  description?: string;
+  price: number;
+  image?: string;
+  rating?: number;
+  review_count?: number;
 }
 
-export const ServiceCard: React.FC<ServiceCardProps> = ({ service }) => {
-  const { addItem } = useCart();
-
+export const ServiceCard = ({
+  id,
+  name,
+  description,
+  price,
+  image,
+  rating = 0,
+  review_count = 0,
+}: ServiceCardProps) => {
+  const { addToCart, items } = useCart();
+  
+  const isInCart = items.some(item => item.id === id);
+  
   const handleAddToCart = () => {
-    const item: ServiceItem = {
-      id: service.id,
-      name: service.name,
-      price: service.price,
+    addToCart({
+      id,
+      name,
+      price,
       quantity: 1,
-    };
-    addItem(item);
+    });
   };
 
   return (
-    <div className="flex flex-col md:flex-row border rounded-lg bg-white overflow-hidden hover:shadow-md transition-shadow">
-      <div className="flex flex-col flex-1 p-5">
-        <div className="flex items-center mb-2">
-          <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
-          <span className="text-sm font-medium ml-1">{service.rating}</span>
-          <span className="text-sm text-gray-500 ml-1">({service.reviews} reviews)</span>
-        </div>
-        
-        <h3 className="font-semibold text-lg">{service.name}</h3>
-        
-        <div className="flex items-center mt-1 text-sm text-gray-600">
-          <Clock className="h-4 w-4 mr-1" />
-          <span>{service.duration}</span>
-        </div>
-        
-        {service.description && (
-          <p className="mt-2 text-sm text-gray-600 line-clamp-2">{service.description}</p>
-        )}
-        
-        <div className="flex items-center justify-between mt-4">
-          <div>
-            <p className="text-lg font-semibold">₹{service.price}</p>
-          </div>
-          <Button 
-            onClick={handleAddToCart} 
-            size="sm" 
-            className="bg-brand hover:bg-brand/90 text-white"
-          >
-            Add
-          </Button>
-        </div>
-      </div>
-      
-      <div className="h-40 md:h-auto md:w-48">
-        <img 
-          src={service.image} 
-          alt={service.name} 
+    <Card className="overflow-hidden h-full flex flex-col">
+      <div className="relative h-48 overflow-hidden">
+        <img
+          src={image || "/placeholder.svg"}
+          alt={name}
           className="w-full h-full object-cover"
         />
       </div>
-    </div>
+      <CardHeader className="pb-2">
+        <CardTitle>{name}</CardTitle>
+        {rating > 0 && (
+          <div className="flex items-center mt-1">
+            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+            <span className="ml-1 text-sm font-medium">{rating}</span>
+            <span className="text-xs text-gray-500 ml-1">({review_count} reviews)</span>
+          </div>
+        )}
+      </CardHeader>
+      <CardContent className="flex-1 pb-2">
+        <CardDescription className="line-clamp-2">{description}</CardDescription>
+      </CardContent>
+      <CardFooter className="flex justify-between items-center pt-2">
+        <div className="font-semibold">₹{price.toFixed(0)}</div>
+        <Button 
+          onClick={handleAddToCart} 
+          disabled={isInCart}
+          className="bg-brand hover:bg-brand/90"
+          size="sm"
+        >
+          {isInCart ? "Added" : "Add to Cart"}
+        </Button>
+      </CardFooter>
+    </Card>
   );
 };

@@ -1,103 +1,131 @@
 
 import React from "react";
-import { useCart } from "@/context/CartContext";
 import { Button } from "@/components/ui/button";
-import { Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
-import { Link } from "react-router-dom";
-import { Sheet, SheetClose, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { ShoppingCart, X } from "lucide-react";
+import { useCart } from "@/context/CartContext";
+import { Link, useNavigate } from "react-router-dom";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
-export const CartSidebar = () => {
-  const { items, removeItem, updateQuantity, totalPrice } = useCart();
+const CartSidebar = () => {
+  const { items, totalPrice, updateQuantity, removeFromCart } = useCart();
+  const navigate = useNavigate();
+  
+  const handleUpdateQuantity = (id: number, quantity: number) => {
+    updateQuantity(id, quantity);
+  };
 
-  const handleQuantityChange = (id: string, newQuantity: number) => {
-    updateQuantity(id, newQuantity);
+  const handleCheckout = () => {
+    navigate('/checkout');
   };
 
   return (
-    <div className="flex flex-col h-full bg-white">
-      <SheetHeader className="px-6 py-6 border-b">
-        <SheetTitle className="flex items-center">
-          <ShoppingCart className="h-5 w-5 mr-2" />
-          Cart
-        </SheetTitle>
-      </SheetHeader>
-
-      {items.length === 0 ? (
-        <div className="flex flex-col items-center justify-center flex-1 p-6">
-          <div className="bg-muted rounded-full p-6 mb-4">
-            <ShoppingCart className="h-10 w-10 text-muted-foreground" />
-          </div>
-          <h3 className="text-xl font-semibold mb-2">Your cart is empty</h3>
-          <p className="text-muted-foreground text-center mb-6">
-            Add services to your cart to book an appointment
-          </p>
-          <SheetClose asChild>
-            <Link to="/services">
-              <Button className="w-full bg-brand hover:bg-brand/90">
-                Browse Services
+    <Sheet>
+      <SheetTrigger asChild>
+        <Button variant="outline" className="relative">
+          <ShoppingCart className="h-5 w-5" />
+          {items.length > 0 && (
+            <span className="absolute -top-2 -right-2 bg-brand text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+              {items.reduce((acc, item) => acc + item.quantity, 0)}
+            </span>
+          )}
+        </Button>
+      </SheetTrigger>
+      <SheetContent className="w-full sm:max-w-md">
+        <div className="flex flex-col h-full">
+          <div className="flex justify-between items-center pb-4 border-b">
+            <h3 className="font-semibold text-lg">Your Cart</h3>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <X className="h-4 w-4" />
               </Button>
-            </Link>
-          </SheetClose>
-        </div>
-      ) : (
-        <>
-          <div className="flex-1 overflow-auto p-4">
-            <div className="space-y-4">
-              {items.map((item) => (
-                <div key={item.id} className="border rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-medium">{item.name}</h4>
-                    <button
-                      onClick={() => removeItem(item.id)}
-                      className="text-gray-400 hover:text-red-500"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        size="icon"
-                        variant="outline"
-                        onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
-                        disabled={item.quantity <= 1}
-                        className="h-8 w-8"
-                      >
-                        <Minus className="h-3 w-3" />
-                      </Button>
-                      <span className="w-8 text-center">{item.quantity}</span>
-                      <Button
-                        size="icon"
-                        variant="outline"
-                        onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
-                        className="h-8 w-8"
-                      >
-                        <Plus className="h-3 w-3" />
-                      </Button>
-                    </div>
-                    <div className="font-semibold">₹{(item.price * item.quantity).toFixed(0)}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            </SheetTrigger>
           </div>
 
-          <div className="border-t p-6">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-muted-foreground">Subtotal</span>
-              <span className="font-medium">₹{totalPrice.toFixed(0)}</span>
+          {items.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full">
+              <ShoppingCart className="h-12 w-12 text-gray-400 mb-4" />
+              <p className="text-gray-500 font-medium">Your cart is empty</p>
+              <SheetTrigger asChild>
+                <Link to="/services">
+                  <Button variant="link" className="mt-2 text-brand">
+                    Browse Services
+                  </Button>
+                </Link>
+              </SheetTrigger>
             </div>
-            <SheetClose asChild>
-              <Link to="/checkout">
-                <Button className="w-full bg-brand hover:bg-brand/90">
-                  View Cart
-                </Button>
-              </Link>
-            </SheetClose>
-          </div>
-        </>
-      )}
-    </div>
+          ) : (
+            <>
+              <ScrollArea className="flex-1 my-4">
+                <div className="space-y-4">
+                  {items.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex justify-between items-center border-b pb-3"
+                    >
+                      <div className="flex flex-col">
+                        <span className="font-medium">{item.name}</span>
+                        <div className="flex items-center mt-1">
+                          <button
+                            onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
+                            disabled={item.quantity <= 1}
+                            className="h-6 w-6 rounded-full border flex items-center justify-center text-gray-500"
+                          >
+                            -
+                          </button>
+                          <span className="mx-2">{item.quantity}</span>
+                          <button
+                            onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
+                            className="h-6 w-6 rounded-full border flex items-center justify-center text-gray-500"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end">
+                        <span className="font-semibold">
+                          ₹{(item.price * item.quantity).toFixed(0)}
+                        </span>
+                        <button
+                          onClick={() => removeFromCart(item.id)}
+                          className="text-xs text-red-600 mt-1"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+
+              <div className="border-t pt-4">
+                <div className="flex justify-between mb-2">
+                  <span className="text-gray-600">Subtotal</span>
+                  <span>₹{totalPrice.toFixed(0)}</span>
+                </div>
+                <div className="flex justify-between mb-4">
+                  <span className="text-gray-600">Tax (10%)</span>
+                  <span>₹{(totalPrice * 0.1).toFixed(0)}</span>
+                </div>
+                <div className="flex justify-between font-semibold text-lg mb-6">
+                  <span>Total</span>
+                  <span>₹{(totalPrice + totalPrice * 0.1).toFixed(0)}</span>
+                </div>
+                <SheetTrigger asChild>
+                  <Button
+                    onClick={handleCheckout}
+                    className="w-full bg-brand hover:bg-brand/90"
+                  >
+                    Checkout
+                  </Button>
+                </SheetTrigger>
+              </div>
+            </>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 };
+
+export default CartSidebar;

@@ -60,6 +60,7 @@ export const RazorpayCheckout = ({
     mutationFn: createPayment,
     onSettled: (data, error) => {
       if (error) {
+        console.error("Payment initialization error:", error);
         toast({
           title: 'Payment initialization failed',
           description: 'Failed to initialize payment. Please try again.',
@@ -76,6 +77,8 @@ export const RazorpayCheckout = ({
       
       if (isScriptLoaded) {
         try {
+          console.log("Creating payment with orderId:", orderId);
+          
           const paymentData = await paymentMutation.mutateAsync({
             orderId,
             amount: amount * 100, // Razorpay takes amount in paise
@@ -101,7 +104,6 @@ export const RazorpayCheckout = ({
                 description: 'Your payment was processed successfully',
               });
               onSuccess(response);
-              navigate('/bookings');
             },
             prefill: {
               name,
@@ -130,6 +132,7 @@ export const RazorpayCheckout = ({
           razorpay.open();
           
         } catch (error) {
+          console.error("Payment initialization error:", error);
           toast({
             title: 'Payment Error',
             description: 'An error occurred while initializing payment',
