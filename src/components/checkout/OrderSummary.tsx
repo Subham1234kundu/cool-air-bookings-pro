@@ -3,10 +3,10 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Minus, Plus } from "lucide-react";
-import { CartItem } from "@/context/CartContext";
+import { ServiceItem } from "@/context/CartContext";
 
 interface OrderSummaryProps {
-  items: CartItem[];
+  items: ServiceItem[];
   updateQuantity: (id: number, quantity: number) => void;
   totalPrice: number;
   onProceedToPayment: () => void;

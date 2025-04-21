@@ -42,14 +42,22 @@ export const getCurrentLocation = (): Promise<{
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
+        console.log('Retrieved coordinates:', latitude, longitude);
 
         // Reverse geocoding to get formatted address
         try {
+          const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+          console.log('Using API Key:', apiKey ? 'Available' : 'Not available');
+          
           const response = await fetch(
-            `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`
+            `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${apiKey}`
           );
+          
           const data = await response.json();
+          console.log('Geocoding response:', data);
+          
           const address = data.results[0]?.formatted_address;
+          console.log('Formatted address:', address);
 
           resolve({
             latitude,
@@ -57,10 +65,13 @@ export const getCurrentLocation = (): Promise<{
             address
           });
         } catch (error) {
+          console.error('Geocoding error:', error);
+          // Still resolve with coordinates if geocoding fails
           resolve({ latitude, longitude });
         }
       },
       (error) => {
+        console.error('Geolocation error:', error);
         reject(error);
       }
     );

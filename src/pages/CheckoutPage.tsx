@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { useCart } from "@/context/CartContext";
 import { Link } from "react-router-dom";
@@ -13,6 +13,7 @@ import { ContactSection } from "@/components/checkout/ContactSection";
 import { DateTimeSection } from "@/components/checkout/DateTimeSection";
 import { OrderSummary } from "@/components/checkout/OrderSummary";
 import { AddLocationDialog } from "@/components/checkout/AddLocationDialog";
+import { supabase } from "@/integrations/supabase/client";
 
 const CheckoutPage = () => {
   const { items, updateQuantity, totalPrice } = useCart();
@@ -29,6 +30,20 @@ const CheckoutPage = () => {
   const [formComplete, setFormComplete] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Effect to check if form is complete whenever form data or selected location changes
+  useEffect(() => {
+    const { fullName, phone, email, date, timeSlot } = formData;
+    const isComplete = 
+      !!fullName && 
+      !!phone && 
+      !!email && 
+      !!date && 
+      !!timeSlot && 
+      !!selectedLocation;
+    
+    setFormComplete(isComplete);
+  }, [formData, selectedLocation]);
 
   const createLocationMutation = useMutation({
     mutationFn: createUserLocation,
@@ -53,18 +68,6 @@ const CheckoutPage = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { id, value } = e.target;
     setFormData(prev => ({ ...prev, [id]: value }));
-    
-    setTimeout(() => {
-      const { fullName, phone, email, date, timeSlot } = formData;
-      setFormComplete(
-        !!fullName && 
-        !!phone && 
-        !!email && 
-        !!date && 
-        !!timeSlot && 
-        !!selectedLocation
-      );
-    }, 100);
   };
 
   const handleProceedToPayment = () => {
