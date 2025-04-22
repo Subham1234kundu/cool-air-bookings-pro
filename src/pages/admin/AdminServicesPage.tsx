@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PlusCircle, Pencil, Trash2, Filter } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,79 +21,29 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 
-// Mock data - replace with actual data fetching when connected to Supabase
-const categories = [
-  { id: 1, name: 'Repair', isActive: true },
-  { id: 2, name: 'Installation', isActive: true },
-  { id: 3, name: 'Maintenance', isActive: true },
-  { id: 4, name: 'Cleaning', isActive: true }
-];
+const fetchServicesAndCategories = async () => {
+  const { data: services, error: servicesError } = await supabase
+    .from('services')
+    .select('*');
 
-const services = [
-  { 
-    id: 1, 
-    name: 'Basic AC Repair', 
-    description: 'Diagnostic and basic repairs for your AC unit', 
-    price: 1500, 
-    categoryId: 1, 
-    duration: '60', 
-    isActive: true,
-    image: '/placeholder.svg'
-  },
-  { 
-    id: 2, 
-    name: 'Advanced AC Repair', 
-    description: 'Comprehensive repairs for complex AC problems', 
-    price: 2500, 
-    categoryId: 1, 
-    duration: '120', 
-    isActive: true,
-    image: '/placeholder.svg'
-  },
-  { 
-    id: 3, 
-    name: 'AC Installation', 
-    description: 'Professional installation of new AC units', 
-    price: 3000, 
-    categoryId: 2, 
-    duration: '180', 
-    isActive: true,
-    image: '/placeholder.svg'
-  },
-  { 
-    id: 4, 
-    name: 'Regular Maintenance', 
-    description: 'Routine check and maintenance of your AC', 
-    price: 1200, 
-    categoryId: 3, 
-    duration: '90', 
-    isActive: true,
-    image: '/placeholder.svg'
-  },
-  { 
-    id: 5, 
-    name: 'Deep Cleaning', 
-    description: 'Thorough cleaning of all AC components', 
-    price: 1800, 
-    categoryId: 4, 
-    duration: '120', 
-    isActive: true,
-    image: '/placeholder.svg'
-  },
-  { 
-    id: 6, 
-    name: 'Emergency Repair', 
-    description: 'Urgent repair service for AC breakdowns', 
-    price: 3000, 
-    categoryId: 1, 
-    duration: '90', 
-    isActive: false,
-    image: '/placeholder.svg'
+  const { data: categories, error: categoriesError } = await supabase
+    .from('categories')
+    .select('*');
+
+  if (servicesError || categoriesError) {
+    throw new Error(servicesError?.message || categoriesError?.message);
   }
-];
+
+  return { services, categories };
+};
 
 const AdminServicesPage = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('all');
   const [selectedService, setSelectedService] = useState<any>(null);
   const [isAddingService, setIsAddingService] = useState(false);
@@ -111,10 +60,44 @@ const AdminServicesPage = () => {
     image: '/placeholder.svg'
   });
   
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['services-and-categories'],
+    queryFn: fetchServicesAndCategories,
+    refetchInterval: 5000 // Real-time update every 5 seconds
+  });
+
+  const services = data?.services || [];
+  const categories = data?.categories || [];
+  
+  const deleteServiceMutation = useMutation({
+    mutationFn: async (serviceId: number) => {
+      const { error } = await supabase
+        .from('services')
+        .delete()
+        .eq('id', serviceId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['services-and-categories'] });
+      toast({
+        title: "Service Deleted",
+        description: "Service removed successfully"
+      });
+    },
+    onError: (error) => {
+      toast({ 
+        title: "Delete Failed", 
+        description: error instanceof Error ? error.message : "An error occurred",
+        variant: "destructive" 
+      });
+    }
+  });
+
   // Filter services by category
   const filteredServices = services.filter(service => 
     activeTab === 'all' || 
-    service.categoryId === parseInt(activeTab)
+    service.category_id === parseInt(activeTab)
   );
   
   const handleAddService = () => {
@@ -134,7 +117,10 @@ const AdminServicesPage = () => {
   const handleEditService = (service: any) => {
     setSelectedService(service);
     setEditForm({
-      ...service
+      ...service,
+      categoryId: service.category_id,
+      isActive: service.is_active,
+      duration: service.duration_minutes?.toString() || ''
     });
   };
   
@@ -159,11 +145,16 @@ const AdminServicesPage = () => {
   };
   
   const handleDeleteService = (serviceId: number) => {
-    // This would delete from Supabase in a real implementation
-    console.log('Deleting service ID:', serviceId);
-    
-    // For demo purposes, we'd update UI state here
+    deleteServiceMutation.mutate(serviceId);
   };
+
+  if (isLoading) {
+    return <div className="flex justify-center items-center h-64">Loading services...</div>;
+  }
+
+  if (error) {
+    return <div className="text-red-500">Error loading services: {error instanceof Error ? error.message : "Unknown error"}</div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -208,29 +199,29 @@ const AdminServicesPage = () => {
           <TabsContent value={activeTab} className="mt-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredServices.map(service => (
-                <Card key={service.id} className={!service.isActive ? 'opacity-60' : ''}>
+                <Card key={service.id} className={!service.is_active ? 'opacity-60' : ''}>
                   <CardContent className="p-0">
                     <div className="relative">
                       <img 
-                        src={service.image} 
+                        src={service.image_url || '/placeholder.svg'} 
                         alt={service.name}
                         className="w-full h-48 object-cover"
                       />
-                      {!service.isActive && (
+                      {!service.is_active && (
                         <div className="absolute top-2 right-2 bg-red-100 text-red-800 text-xs font-medium px-2 py-0.5 rounded">
                           Inactive
                         </div>
                       )}
                       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
                         <h3 className="text-lg font-semibold text-white">{service.name}</h3>
-                        <p className="text-sm text-white/80">₹{service.price} • {service.duration} min</p>
+                        <p className="text-sm text-white/80">₹{service.price} • {service.duration_minutes} min</p>
                       </div>
                     </div>
                     <div className="p-4">
                       <p className="text-sm line-clamp-2">{service.description}</p>
                       <div className="flex justify-between items-center mt-4">
                         <span className="text-xs bg-slate-100 px-2 py-1 rounded">
-                          {categories.find(c => c.id === service.categoryId)?.name}
+                          {categories.find(c => c.id === service.category_id)?.name}
                         </span>
                         <div className="flex gap-1">
                           <Button variant="ghost" size="icon" onClick={() => handleEditService(service)}>

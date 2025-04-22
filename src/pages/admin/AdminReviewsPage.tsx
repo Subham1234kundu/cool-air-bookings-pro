@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Star, ThumbsUp, ThumbsDown, Eye, EyeOff, MessageSquare } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -19,77 +18,73 @@ import {
 } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 
-// Mock data - replace with actual data fetching when connected to Supabase
-const mockReviews = Array(12).fill(null).map((_, i) => ({
-  id: `REV-${1000 + i}`,
-  userId: `USER-${100 + i}`,
-  serviceId: i % 6 + 1,
-  orderId: `ORD-${900 + i}`,
-  userName: `Customer ${i + 1}`,
-  serviceName: [
-    'Basic AC Repair',
-    'Advanced AC Repair',
-    'AC Installation', 
-    'Regular Maintenance',
-    'Deep Cleaning',
-    'Emergency Repair'
-  ][i % 6],
-  rating: Math.floor(Math.random() * 3) + 3, // 3-5 stars
-  comment: [
-    'Great service, very professional and quick.',
-    'The technician was knowledgeable and helped fix the issue in no time.',
-    'Excellent service quality, would recommend to others!',
-    'On-time arrival and efficient service.',
-    'Good service but slightly expensive.',
-    'Very satisfied with the work done, AC is working perfectly now.',
-  ][i % 6],
-  createdAt: new Date(Date.now() - (i * 86400000 * 2)).toISOString(),
-  isApproved: i < 10, // First 10 are approved
-  hasAdminResponse: i < 5,
-  adminResponse: i < 5 ? "Thank you for your feedback! We're glad you had a positive experience." : ''
-}));
+const fetchReviews = async () => {
+  const { data: reviews, error } = await supabase
+    .from('reviews')
+    .select(`
+      *,
+      services (name)
+    `)
+    .order('created_at', { ascending: false });
+  
+  if (error) throw error;
+  return reviews;
+};
 
 const AdminReviewsPage = () => {
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [ratingFilter, setRatingFilter] = useState('all');
   const [selectedReview, setSelectedReview] = useState<any>(null);
   const [adminResponse, setAdminResponse] = useState('');
-  
-  // Apply filters
-  const filteredReviews = mockReviews.filter(review => {
-    const matchesSearch = 
-      review.userName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      review.serviceName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      review.comment.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = 
-      statusFilter === 'all' || 
-      (statusFilter === 'approved' && review.isApproved) || 
-      (statusFilter === 'pending' && !review.isApproved);
-    
-    const matchesRating = 
-      ratingFilter === 'all' || 
-      review.rating === parseInt(ratingFilter);
-    
-    return matchesSearch && matchesStatus && matchesRating;
+  const { toast } = useToast();
+
+  const { data: reviews = [], isLoading, error } = useQuery({
+    queryKey: ['admin-reviews'],
+    queryFn: fetchReviews,
+    refetchInterval: 5000 // Real-time update every 5 seconds
   });
-  
-  const handleToggleApproval = (reviewId: string) => {
-    // This would update the review approval status in Supabase
-    console.log(`Toggle approval for review ${reviewId}`);
-    // For UI demo, update locally:
-    mockReviews.forEach(review => {
-      if (review.id === reviewId) {
-        review.isApproved = !review.isApproved;
-      }
-    });
+
+  const toggleApprovalMutation = useMutation({
+    mutationFn: async (reviewId) => {
+      const { data: existingReview } = await supabase
+        .from('reviews')
+        .select('is_approved')
+        .eq('id', reviewId)
+        .single();
+
+      const { error } = await supabase
+        .from('reviews')
+        .update({ is_approved: !existingReview.is_approved })
+        .eq('id', reviewId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['admin-reviews']);
+      toast({ title: "Review Status Updated" });
+    },
+    onError: (error) => {
+      toast({ 
+        title: "Update Failed", 
+        description: error instanceof Error ? error.message : "An error occurred",
+        variant: "destructive" 
+      });
+    }
+  });
+
+  const handleToggleApproval = (reviewId) => {
+    toggleApprovalMutation.mutate(reviewId);
   };
-  
-  const handleViewReview = (review: any) => {
+
+    const handleViewReview = (review: any) => {
     setSelectedReview(review);
-    setAdminResponse(review.adminResponse || '');
+    setAdminResponse(review.admin_response || '');
   };
   
   const handleSaveResponse = () => {
@@ -98,8 +93,8 @@ const AdminReviewsPage = () => {
       console.log(`Saving response for review ${selectedReview.id}:`, adminResponse);
       
       // For UI demo, update locally:
-      selectedReview.adminResponse = adminResponse;
-      selectedReview.hasAdminResponse = true;
+      // selectedReview.admin_response = adminResponse;
+      // selectedReview.hasAdminResponse = true;
       
       setSelectedReview(null);
     }
@@ -113,6 +108,24 @@ const AdminReviewsPage = () => {
       />
     ));
   };
+
+  // Filter reviews based on search and filter criteria
+  const filteredReviews = reviews.filter(review => {
+    const matchesSearch = 
+      review.comment?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      review.services?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesStatus = 
+      statusFilter === 'all' || 
+      (statusFilter === 'approved' && review.is_approved) ||
+      (statusFilter === 'pending' && !review.is_approved);
+    
+    const matchesRating = 
+      ratingFilter === 'all' || 
+      review.rating === parseInt(ratingFilter);
+    
+    return matchesSearch && matchesStatus && matchesRating;
+  });
 
   return (
     <div className="space-y-6">
@@ -159,16 +172,16 @@ const AdminReviewsPage = () => {
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredReviews.map(review => (
-          <Card key={review.id} className={!review.isApproved ? 'border-dashed border-gray-300' : ''}>
+          <Card key={review.id} className={!review.is_approved ? 'border-dashed border-gray-300' : ''}>
             <CardHeader className="pb-2">
               <div className="flex justify-between">
                 <div>
                   <div className="flex gap-1 mb-1">
                     {renderStars(review.rating)}
                   </div>
-                  <CardTitle className="text-lg">{review.serviceName}</CardTitle>
+                  <CardTitle className="text-lg">{review.services?.name}</CardTitle>
                 </div>
-                {!review.isApproved && (
+                {!review.is_approved && (
                   <div className="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-0.5 rounded h-fit">
                     Pending Approval
                   </div>
@@ -177,18 +190,18 @@ const AdminReviewsPage = () => {
             </CardHeader>
             <CardContent className="pb-2">
               <div className="flex flex-col gap-1">
-                <div className="flex justify-between items-center mb-1">
+                {/* <div className="flex justify-between items-center mb-1">
                   <span className="font-medium">{review.userName}</span>
                   <span className="text-xs text-gray-500">
-                    {new Date(review.createdAt).toLocaleDateString()}
+                    {new Date(review.created_at).toLocaleDateString()}
                   </span>
-                </div>
+                </div> */}
                 <p className="text-sm line-clamp-3">{review.comment}</p>
                 
-                {review.hasAdminResponse && (
+                {review.admin_response && (
                   <div className="mt-3 bg-slate-50 p-2 rounded-md">
                     <p className="text-xs font-medium">Response:</p>
-                    <p className="text-xs line-clamp-2">{review.adminResponse}</p>
+                    <p className="text-xs line-clamp-2">{review.admin_response}</p>
                   </div>
                 )}
               </div>
@@ -201,15 +214,15 @@ const AdminReviewsPage = () => {
                   onClick={() => handleViewReview(review)}
                 >
                   <MessageSquare className="h-4 w-4 mr-1" />
-                  {review.hasAdminResponse ? 'Edit Response' : 'Respond'}
+                  {review.admin_response ? 'Edit Response' : 'Respond'}
                 </Button>
                 
                 <Button 
-                  variant={review.isApproved ? 'ghost' : 'outline'} 
+                  variant={review.is_approved ? 'ghost' : 'outline'} 
                   size="sm" 
                   onClick={() => handleToggleApproval(review.id)}
                 >
-                  {review.isApproved ? (
+                  {review.is_approved ? (
                     <>
                       <EyeOff className="h-4 w-4 mr-1 text-red-500" />
                       <span className="text-red-500">Hide</span>
@@ -240,7 +253,7 @@ const AdminReviewsPage = () => {
             <DialogHeader>
               <DialogTitle>Review Response</DialogTitle>
               <DialogDescription>
-                Respond to customer review for {selectedReview.serviceName}
+                Respond to customer review for {selectedReview.services?.name}
               </DialogDescription>
             </DialogHeader>
             
@@ -249,10 +262,10 @@ const AdminReviewsPage = () => {
                 <div className="flex gap-1 mb-2">
                   {renderStars(selectedReview.rating)}
                 </div>
-                <p className="text-sm font-medium mb-1">{selectedReview.userName}</p>
+                {/* <p className="text-sm font-medium mb-1">{selectedReview.userName}</p> */}
                 <p className="text-sm">{selectedReview.comment}</p>
                 <p className="text-xs text-gray-500 mt-2">
-                  {new Date(selectedReview.createdAt).toLocaleDateString()}
+                  {new Date(selectedReview.created_at).toLocaleDateString()}
                 </p>
               </div>
               

@@ -1,31 +1,59 @@
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { PieChart, Pie, Cell } from 'recharts';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { TabsContent, TabsList, TabsTrigger, Tabs } from "@/components/ui/tabs";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 
-// Mock data - replace with actual data fetching when connected to Supabase
-const salesData = [
-  { name: 'Mon', sales: 4000 },
-  { name: 'Tue', sales: 3000 },
-  { name: 'Wed', sales: 2000 },
-  { name: 'Thu', sales: 2780 },
-  { name: 'Fri', sales: 1890 },
-  { name: 'Sat', sales: 2390 },
-  { name: 'Sun', sales: 3490 },
-];
+const fetchDashboardData = async () => {
+  const { data: orders, error: ordersError } = await supabase
+    .from('orders')
+    .select('*');
 
-const bookingsByCategory = [
-  { name: 'Repair', value: 400 },
-  { name: 'Installation', value: 300 },
-  { name: 'Maintenance', value: 300 },
-  { name: 'Cleaning', value: 200 },
-];
+  const { data: services, error: servicesError } = await supabase
+    .from('services')
+    .select('*');
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
+  if (ordersError || servicesError) {
+    throw new Error(ordersError?.message || servicesError?.message);
+  }
+
+  return { orders, services };
+};
 
 const AdminDashboardPage = () => {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['dashboard-data'],
+    queryFn: fetchDashboardData,
+    refetchInterval: 5000 // Real-time update every 5 seconds
+  });
+
+  // Calculate real-time metrics
+  const totalRevenue = data?.orders?.reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0;
+  const totalBookings = data?.orders?.length || 0;
+  const activeJobs = data?.orders?.filter(order => order.status === 'in progress').length || 0;
+
+  // Mock data for charts
+  const salesData = [
+    { name: 'Mon', sales: 4000 },
+    { name: 'Tue', sales: 3000 },
+    { name: 'Wed', sales: 2000 },
+    { name: 'Thu', sales: 2780 },
+    { name: 'Fri', sales: 1890 },
+    { name: 'Sat', sales: 2390 },
+    { name: 'Sun', sales: 3490 },
+  ];
+
+  const bookingsByCategory = [
+    { name: 'Repair', value: 400 },
+    { name: 'Installation', value: 300 },
+    { name: 'Maintenance', value: 300 },
+    { name: 'Cleaning', value: 200 },
+  ];
+
+  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
+
   return (
     <div className="space-y-6">
       <div>
@@ -51,9 +79,9 @@ const AdminDashboardPage = () => {
             </svg>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹45,231.89</div>
+            <div className="text-2xl font-bold">₹{totalRevenue.toFixed(2)}</div>
             <p className="text-xs text-muted-foreground">
-              +20.1% from last month
+              Real-time revenue tracking
             </p>
           </CardContent>
         </Card>
@@ -76,9 +104,9 @@ const AdminDashboardPage = () => {
             </svg>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">245</div>
+            <div className="text-2xl font-bold">{totalBookings}</div>
             <p className="text-xs text-muted-foreground">
-              +12% from last month
+              Real-time bookings
             </p>
           </CardContent>
         </Card>
@@ -100,7 +128,7 @@ const AdminDashboardPage = () => {
             </svg>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">18</div>
+            <div className="text-2xl font-bold">{activeJobs}</div>
             <p className="text-xs text-muted-foreground">
               Currently in progress
             </p>
