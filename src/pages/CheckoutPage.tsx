@@ -29,6 +29,7 @@ const CheckoutPage = () => {
     timeSlot: ''
   });
   const [formComplete, setFormComplete] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'cash'>('razorpay');
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -71,11 +72,18 @@ const CheckoutPage = () => {
     onSuccess: (createdOrder) => {
       console.log("Order created successfully:", createdOrder);
       setCurrentOrderId(createdOrder.id);
-      setShowPaymentGateway(true);
+      
+      if (paymentMethod === 'razorpay') {
+        setShowPaymentGateway(true);
+      } else {
+        handleCashPayment(createdOrder.id);
+      }
 
       toast({
         title: "Booking Created",
-        description: "Proceeding to payment...",
+        description: paymentMethod === 'razorpay' 
+          ? "Proceeding to payment..." 
+          : "Order placed successfully with Cash on Delivery",
       });
     },
     onError: (error) => {
@@ -87,6 +95,36 @@ const CheckoutPage = () => {
       });
     }
   });
+
+  const handleCashPayment = async (orderId: number) => {
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({
+          payment_method: 'cash',
+          payment_status: 'pending',
+          status: 'confirmed'
+        })
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Cash Order Confirmed",
+        description: "Your order has been placed successfully.",
+      });
+      
+      clearCart();
+      navigate("/bookings");
+    } catch (error: any) {
+      console.error("Cash payment update error:", error);
+      toast({
+        title: "Order Update Error",
+        description: error?.message || "Could not update order. Please contact support.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { id, value } = e.target;
@@ -228,6 +266,24 @@ const CheckoutPage = () => {
               formData={formData}
               onChange={handleInputChange}
             />
+
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+              <h2 className="text-xl font-semibold mb-4">Payment Method</h2>
+              <div className="flex gap-4">
+                <Button
+                  variant={paymentMethod === 'razorpay' ? 'default' : 'outline'}
+                  onClick={() => setPaymentMethod('razorpay')}
+                >
+                  Online Payment
+                </Button>
+                <Button
+                  variant={paymentMethod === 'cash' ? 'default' : 'outline'}
+                  onClick={() => setPaymentMethod('cash')}
+                >
+                  Cash on Delivery
+                </Button>
+              </div>
+            </div>
           </div>
 
           <div className="lg:w-4/12">
@@ -257,7 +313,7 @@ const CheckoutPage = () => {
         isLoading={createLocationMutation.isPending}
       />
 
-      {showPaymentGateway && currentOrderId && (
+      {showPaymentGateway && currentOrderId && paymentMethod === 'razorpay' && (
         <RazorpayCheckout
           amount={totalPrice + totalPrice * 0.1}
           name={formData.fullName}
