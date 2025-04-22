@@ -145,11 +145,14 @@ export type Database = {
           address: string | null
           coupon_id: number | null
           created_at: string | null
+          email: string | null
+          fullname: string | null
           id: number
           latitude: number | null
           longitude: number | null
           payment_id: string | null
           payment_status: string | null
+          phone: string | null
           scheduled_at: string
           status: string | null
           total_amount: number | null
@@ -159,11 +162,14 @@ export type Database = {
           address?: string | null
           coupon_id?: number | null
           created_at?: string | null
+          email?: string | null
+          fullname?: string | null
           id?: number
           latitude?: number | null
           longitude?: number | null
           payment_id?: string | null
           payment_status?: string | null
+          phone?: string | null
           scheduled_at: string
           status?: string | null
           total_amount?: number | null
@@ -173,11 +179,14 @@ export type Database = {
           address?: string | null
           coupon_id?: number | null
           created_at?: string | null
+          email?: string | null
+          fullname?: string | null
           id?: number
           latitude?: number | null
           longitude?: number | null
           payment_id?: string | null
           payment_status?: string | null
+          phone?: string | null
           scheduled_at?: string
           status?: string | null
           total_amount?: number | null
@@ -346,6 +355,7 @@ export type Database = {
           duration_minutes: number | null
           id: number
           image_url: string | null
+          is_active: boolean | null
           name: string
           price: number
           rating: number | null
@@ -357,6 +367,7 @@ export type Database = {
           duration_minutes?: number | null
           id?: number
           image_url?: string | null
+          is_active?: boolean | null
           name: string
           price: number
           rating?: number | null
@@ -368,6 +379,7 @@ export type Database = {
           duration_minutes?: number | null
           id?: number
           image_url?: string | null
+          is_active?: boolean | null
           name?: string
           price?: number
           rating?: number | null

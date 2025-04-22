@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
 
@@ -13,7 +14,8 @@ export async function fetchServices() {
       rating,
       review_count,
       image_url,
-      category_id
+      category_id,
+      is_active
     `)
     .order('id');
     
