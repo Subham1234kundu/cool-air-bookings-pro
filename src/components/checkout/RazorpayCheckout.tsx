@@ -43,6 +43,10 @@ const loadRazorpayScript = (): Promise<boolean> => {
   });
 };
 
+// Replace with your actual Razorpay test key (this is typically safe to expose in client-side code)
+// In production, you would want to get this from environment variables
+const RAZORPAY_KEY = 'rzp_test_gPj9pWYShmkiZW'; 
+
 export const RazorpayCheckout = ({ 
   amount,
   name,
@@ -76,7 +80,7 @@ export const RazorpayCheckout = ({
 
   const openRazorpayCheckout = (paymentData: any) => {
     const options = {
-      key: 'rzp_test_your_key_here', // Replace with your actual Razorpay key
+      key: RAZORPAY_KEY, // Using the key from constant
       amount: amount * 100, // Amount in paise
       currency: 'INR',
       name: 'Cool Air Service',
@@ -95,7 +99,8 @@ export const RazorpayCheckout = ({
         contact: phone,
       },
       notes: {
-        address: address
+        address: address,
+        userId: paymentData.user_id || ''
       },
       theme: {
         color: '#3399cc',
@@ -112,8 +117,18 @@ export const RazorpayCheckout = ({
       }
     };
 
-    const razorpay = new window.Razorpay(options);
-    razorpay.open();
+    try {
+      const razorpay = new window.Razorpay(options);
+      razorpay.open();
+    } catch (error) {
+      console.error("Error opening Razorpay:", error);
+      toast({
+        title: 'Payment Error',
+        description: 'Failed to open payment gateway',
+        variant: 'destructive',
+      });
+      onFailure(error);
+    }
   };
 
   useEffect(() => {
@@ -124,6 +139,9 @@ export const RazorpayCheckout = ({
       if (isScriptLoaded) {
         try {          
           console.log("Creating payment with amount:", amount);
+          const { data: user } = await supabase.auth.getUser();
+          const userId = user?.user?.id || '';
+          
           paymentMutation.mutate({
             orderId,
             amount: amount * 100, // Razorpay takes amount in paise
@@ -132,7 +150,7 @@ export const RazorpayCheckout = ({
               address,
               email,
               name,
-              userId: (await supabase.auth.getUser()).data.user?.id || ''
+              userId
             }
           });
           

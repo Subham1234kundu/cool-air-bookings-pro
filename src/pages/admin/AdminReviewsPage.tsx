@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Star, ThumbsUp, ThumbsDown, Eye, EyeOff, MessageSquare } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -51,7 +52,7 @@ const AdminReviewsPage = () => {
   });
 
   const toggleApprovalMutation = useMutation({
-    mutationFn: async (reviewId) => {
+    mutationFn: async (reviewId: number) => {
       const { data: existingReview } = await supabase
         .from('reviews')
         .select('is_approved')
@@ -66,7 +67,7 @@ const AdminReviewsPage = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['admin-reviews']);
+      queryClient.invalidateQueries({ queryKey: ['admin-reviews'] });
       toast({ title: "Review Status Updated" });
     },
     onError: (error) => {
@@ -78,25 +79,44 @@ const AdminReviewsPage = () => {
     }
   });
 
-  const handleToggleApproval = (reviewId) => {
+  const saveResponseMutation = useMutation({
+    mutationFn: async ({ reviewId, response }: { reviewId: number, response: string }) => {
+      const { error } = await supabase
+        .from('reviews')
+        .update({ admin_response: response })
+        .eq('id', reviewId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-reviews'] });
+      toast({ title: "Response Saved" });
+      setSelectedReview(null);
+    },
+    onError: (error) => {
+      toast({ 
+        title: "Save Failed", 
+        description: error instanceof Error ? error.message : "An error occurred",
+        variant: "destructive" 
+      });
+    }
+  });
+
+  const handleToggleApproval = (reviewId: number) => {
     toggleApprovalMutation.mutate(reviewId);
   };
 
-    const handleViewReview = (review: any) => {
+  const handleViewReview = (review: any) => {
     setSelectedReview(review);
     setAdminResponse(review.admin_response || '');
   };
   
   const handleSaveResponse = () => {
     if (selectedReview) {
-      // This would save to Supabase in a real implementation
-      console.log(`Saving response for review ${selectedReview.id}:`, adminResponse);
-      
-      // For UI demo, update locally:
-      // selectedReview.admin_response = adminResponse;
-      // selectedReview.hasAdminResponse = true;
-      
-      setSelectedReview(null);
+      saveResponseMutation.mutate({ 
+        reviewId: selectedReview.id, 
+        response: adminResponse 
+      });
     }
   };
 
