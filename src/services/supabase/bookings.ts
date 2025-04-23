@@ -41,8 +41,8 @@ export async function createBooking(bookingData: {
         status: 'pending',
         payment_status: 'unpaid',
         address: bookingData.address,
-        // Store contact information
-        fullName: bookingData.contactInfo?.fullName,
+        // Store contact information - use lowercase 'n' for fullname to match database column
+        fullname: bookingData.contactInfo?.fullName,
         email: bookingData.contactInfo?.email,
         phone: bookingData.contactInfo?.phone
       })
