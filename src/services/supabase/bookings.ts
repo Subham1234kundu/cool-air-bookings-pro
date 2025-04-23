@@ -40,6 +40,7 @@ export async function createBooking(bookingData: {
         total_amount: bookingData.totalAmount,
         status: 'pending',
         payment_status: 'unpaid',
+        payment_method: 'razorpay', // Default payment method
         address: bookingData.address,
         // Store contact information - use lowercase 'n' for fullname to match database column
         fullname: bookingData.contactInfo?.fullName,

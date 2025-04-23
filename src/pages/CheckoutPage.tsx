@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { useCart } from "@/context/CartContext";
@@ -99,7 +98,6 @@ const CheckoutPage = () => {
 
   const handleCashPayment = async (orderId: number) => {
     try {
-      // Define time map for converting time slots to hours
       const timeMap: { [key: string]: string } = {
         'morning': '10:00',
         'afternoon': '14:00',
@@ -117,7 +115,7 @@ const CheckoutPage = () => {
           longitude: selectedLocation?.longitude,
           phone: formData.phone,
           email: formData.email,
-          fullname: formData.fullName, // Note: lowercase 'n' to match database column name
+          fullname: formData.fullName,
           scheduled_at: `${formData.date}T${timeMap[formData.timeSlot] || '12:00'}:00`
         })
         .eq('id', orderId);

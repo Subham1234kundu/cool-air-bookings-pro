@@ -151,6 +151,7 @@ export type Database = {
           latitude: number | null
           longitude: number | null
           payment_id: string | null
+          payment_method: string | null
           payment_status: string | null
           phone: string | null
           scheduled_at: string
@@ -168,6 +169,7 @@ export type Database = {
           latitude?: number | null
           longitude?: number | null
           payment_id?: string | null
+          payment_method?: string | null
           payment_status?: string | null
           phone?: string | null
           scheduled_at: string
@@ -185,6 +187,7 @@ export type Database = {
           latitude?: number | null
           longitude?: number | null
           payment_id?: string | null
+          payment_method?: string | null
           payment_status?: string | null
           phone?: string | null
           scheduled_at?: string
