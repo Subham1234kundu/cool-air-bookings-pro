@@ -1,4 +1,5 @@
-import React from 'react';
+
+import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tables } from "@/integrations/supabase/types";
 import { useToast } from "@/hooks/use-toast";
 import { createService, updateService } from "@/services/supabase/services";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ServiceFormDialogProps {
   isOpen: boolean;
@@ -48,9 +50,69 @@ export const ServiceFormDialog: React.FC<ServiceFormDialogProps> = ({
   selectedService
 }) => {
   const { toast } = useToast();
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setImageFile(file);
+    
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const uploadImage = async (file: File): Promise<string | null> => {
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+      const filePath = `services/${fileName}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('service-images')
+        .upload(filePath, file);
+        
+      if (uploadError) {
+        throw uploadError;
+      }
+      
+      const { data } = supabase.storage
+        .from('service-images')
+        .getPublicUrl(filePath);
+        
+      return data.publicUrl;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      return null;
+    }
+  };
 
   const handleSave = async () => {
     try {
+      setIsLoading(true);
+      
+      let imageUrl = editForm.image;
+      
+      // Upload image if there's a new file
+      if (imageFile) {
+        const uploadedUrl = await uploadImage(imageFile);
+        if (uploadedUrl) {
+          imageUrl = uploadedUrl;
+        } else {
+          toast({
+            title: "Warning",
+            description: "Failed to upload image, but continuing with service save.",
+            variant: "destructive"
+          });
+        }
+      }
+      
       const serviceData = {
         name: editForm.name,
         description: editForm.description,
@@ -58,7 +120,7 @@ export const ServiceFormDialog: React.FC<ServiceFormDialogProps> = ({
         category_id: editForm.categoryId,
         duration_minutes: parseInt(editForm.duration),
         is_active: editForm.isActive,
-        image_url: editForm.image
+        image_url: imageUrl
       };
 
       if (selectedService) {
@@ -82,6 +144,8 @@ export const ServiceFormDialog: React.FC<ServiceFormDialogProps> = ({
         description: "Failed to save service. Please try again.",
         variant: "destructive"
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -128,7 +192,7 @@ export const ServiceFormDialog: React.FC<ServiceFormDialogProps> = ({
               id="price" 
               type="number" 
               value={editForm.price} 
-              onChange={(e) => setEditForm({...editForm, price: parseInt(e.target.value)})} 
+              onChange={(e) => setEditForm({...editForm, price: parseFloat(e.target.value)})} 
               className="col-span-3" 
             />
           </div>
@@ -154,13 +218,26 @@ export const ServiceFormDialog: React.FC<ServiceFormDialogProps> = ({
             />
           </div>
           
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="image" className="col-span-1">Image</Label>
-            <Input 
-              id="image" 
-              type="file" 
-              className="col-span-3" 
-            />
+          <div className="grid grid-cols-4 items-start gap-4">
+            <Label htmlFor="image" className="col-span-1 pt-2">Image</Label>
+            <div className="col-span-3 space-y-2">
+              <Input 
+                id="image" 
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+              />
+              {(imagePreview || editForm.image) && (
+                <div className="mt-2">
+                  <p className="text-sm text-muted-foreground mb-1">Preview:</p>
+                  <img 
+                    src={imagePreview || editForm.image} 
+                    alt="Service preview" 
+                    className="w-full max-w-[200px] h-auto rounded-md border"
+                  />
+                </div>
+              )}
+            </div>
           </div>
           
           <div className="grid grid-cols-4 items-center gap-4">
@@ -179,11 +256,11 @@ export const ServiceFormDialog: React.FC<ServiceFormDialogProps> = ({
         </div>
         
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={onClose} disabled={isLoading}>
             Cancel
           </Button>
-          <Button onClick={handleSave}>
-            {selectedService ? 'Update' : 'Add'} Service
+          <Button onClick={handleSave} disabled={isLoading}>
+            {isLoading ? 'Saving...' : selectedService ? 'Update' : 'Add'} Service
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,31 +1,17 @@
+
 import React, { useState } from 'react';
 import { PlusCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { ServiceCard } from "@/components/admin/services/ServiceCard";
 import { ServiceFormDialog } from "@/components/admin/services/ServiceFormDialog";
 import { CategoryFormDialog } from "@/components/admin/services/CategoryFormDialog";
 import { Tables } from "@/integrations/supabase/types";
-
-const fetchServicesAndCategories = async () => {
-  const { data: services, error: servicesError } = await supabase
-    .from('services')
-    .select('*');
-
-  const { data: categories, error: categoriesError } = await supabase
-    .from('categories')
-    .select('*');
-
-  if (servicesError || categoriesError) {
-    throw new Error(servicesError?.message || categoriesError?.message);
-  }
-
-  return { services, categories };
-};
+import { fetchServices, toggleServiceStatus } from "@/services/supabase/services";
+import { fetchCategories, createCategory, updateCategory } from "@/services/supabase/categories";
 
 const AdminServicesPage = () => {
   const queryClient = useQueryClient();
@@ -34,7 +20,11 @@ const AdminServicesPage = () => {
   const [selectedService, setSelectedService] = useState<Tables<'services'> | null>(null);
   const [isAddingService, setIsAddingService] = useState(false);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
-  const [newCategory, setNewCategory] = useState({ name: '', isActive: true });
+  const [newCategory, setNewCategory] = useState({ 
+    name: '', 
+    description: '',
+    image_url: '' 
+  });
   const [editForm, setEditForm] = useState({
     id: 0,
     name: '',
@@ -43,17 +33,21 @@ const AdminServicesPage = () => {
     categoryId: 1,
     duration: '',
     isActive: true,
-    image: '/placeholder.svg'
+    image: ''
   });
   
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['services-and-categories'],
-    queryFn: fetchServicesAndCategories,
-    refetchInterval: 5000
+  const { data: servicesData, isLoading: servicesLoading } = useQuery({
+    queryKey: ['services'],
+    queryFn: fetchServices
   });
 
-  const services = data?.services || [];
-  const categories = data?.categories || [];
+  const { data: categoriesData, isLoading: categoriesLoading } = useQuery({
+    queryKey: ['categories'],
+    queryFn: fetchCategories
+  });
+
+  const services = servicesData || [];
+  const categories = categoriesData || [];
   
   const deleteServiceMutation = useMutation({
     mutationFn: async (serviceId: number) => {
@@ -65,7 +59,7 @@ const AdminServicesPage = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['services-and-categories'] });
+      queryClient.invalidateQueries({ queryKey: ['services'] });
       toast({
         title: "Service Deleted",
         description: "Service removed successfully"
@@ -80,6 +74,25 @@ const AdminServicesPage = () => {
     }
   });
 
+  const createCategoryMutation = useMutation({
+    mutationFn: createCategory,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      toast({
+        title: "Category Created",
+        description: "New category added successfully"
+      });
+      setIsAddingCategory(false);
+    },
+    onError: (error) => {
+      toast({ 
+        title: "Failed to create category", 
+        description: error instanceof Error ? error.message : "An error occurred",
+        variant: "destructive" 
+      });
+    }
+  });
+  
   const filteredServices = services.filter(service => 
     activeTab === 'all' || 
     service.category_id === parseInt(activeTab)
@@ -87,15 +100,16 @@ const AdminServicesPage = () => {
   
   const handleAddService = () => {
     setIsAddingService(true);
+    setSelectedService(null);
     setEditForm({
       id: 0,
       name: '',
       description: '',
       price: 0,
-      categoryId: 1,
-      duration: '',
+      categoryId: categories.length > 0 ? categories[0].id : 1,
+      duration: '30',
       isActive: true,
-      image: '/placeholder.svg'
+      image: ''
     });
   };
   
@@ -109,13 +123,12 @@ const AdminServicesPage = () => {
       categoryId: service.category_id || 1,
       duration: service.duration_minutes?.toString() || '',
       isActive: service.is_active || true,
-      image: service.image_url || '/placeholder.svg'
+      image: service.image_url || ''
     });
   };
   
   const handleSaveService = () => {
-    console.log('Saving service:', editForm);
-    
+    queryClient.invalidateQueries({ queryKey: ['services'] });
     if (selectedService) {
       setSelectedService(null);
     } else {
@@ -124,21 +137,17 @@ const AdminServicesPage = () => {
   };
   
   const handleSaveCategory = () => {
-    console.log('Saving category:', newCategory);
-    
-    setIsAddingCategory(false);
+    createCategoryMutation.mutate(newCategory);
   };
   
   const handleDeleteService = (serviceId: number) => {
     deleteServiceMutation.mutate(serviceId);
   };
 
+  const isLoading = servicesLoading || categoriesLoading;
+
   if (isLoading) {
     return <div className="flex justify-center items-center h-64">Loading services...</div>;
-  }
-
-  if (error) {
-    return <div className="text-red-500">Error loading services: {error instanceof Error ? error.message : "Unknown error"}</div>;
   }
 
   return (
@@ -167,7 +176,10 @@ const AdminServicesPage = () => {
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={() => setIsAddingCategory(true)}
+                onClick={() => {
+                  setIsAddingCategory(true);
+                  setNewCategory({ name: '', description: '', image_url: '' });
+                }}
               >
                 Add Category
               </Button>

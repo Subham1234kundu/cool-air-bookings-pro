@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { PieChart, Pie, Cell } from 'recharts';
@@ -7,52 +8,153 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 
 const fetchDashboardData = async () => {
+  // Fetch orders data
   const { data: orders, error: ordersError } = await supabase
     .from('orders')
     .select('*');
 
+  // Fetch services data
   const { data: services, error: servicesError } = await supabase
     .from('services')
     .select('*');
+    
+  // Fetch reviews data
+  const { data: reviews, error: reviewsError } = await supabase
+    .from('reviews')
+    .select('*');
+    
+  // Fetch bookings by category for pie chart
+  const { data: categoryBookings, error: categoryError } = await supabase
+    .from('orders')
+    .select('order_items(service_id), services!inner(category_id, categories!inner(name))')
+    .limit(50);
 
-  if (ordersError || servicesError) {
-    throw new Error(ordersError?.message || servicesError?.message);
+  if (ordersError || servicesError || reviewsError || categoryError) {
+    throw new Error(ordersError?.message || servicesError?.message || reviewsError?.message || categoryError?.message);
   }
 
-  return { orders, services };
+  // Process data for pie chart
+  const categoryCounts: Record<string, number> = {};
+  if (categoryBookings) {
+    categoryBookings.forEach((booking: any) => {
+      if (booking.order_items && booking.order_items.length > 0) {
+        const categoryName = booking.services?.categories?.name;
+        if (categoryName) {
+          categoryCounts[categoryName] = (categoryCounts[categoryName] || 0) + 1;
+        }
+      }
+    });
+  }
+
+  const bookingsByCategory = Object.keys(categoryCounts).map(name => ({
+    name,
+    value: categoryCounts[name]
+  }));
+
+  // Generate daily sales data for the past week
+  const last7Days = Array.from({ length: 7 }, (_, i) => {
+    const date = new Date();
+    date.setDate(date.getDate() - i);
+    return date;
+  }).reverse();
+
+  const dailySales = last7Days.map(date => {
+    const dayStr = date.toLocaleDateString('en-US', { weekday: 'short' });
+    const isoDate = date.toISOString().split('T')[0];
+    
+    // Filter orders for this date
+    const dayOrders = orders?.filter(order => {
+      const orderDate = new Date(order.created_at || '').toISOString().split('T')[0];
+      return orderDate === isoDate;
+    }) || [];
+    
+    // Calculate total sales for this date
+    const daySales = dayOrders.reduce((sum, order) => sum + (order.total_amount || 0), 0);
+    
+    return { name: dayStr, sales: daySales };
+  });
+
+  return { 
+    orders: orders || [], 
+    services: services || [],
+    reviews: reviews || [],
+    dailySales,
+    bookingsByCategory: bookingsByCategory.length > 0 ? bookingsByCategory : [
+      { name: 'No Data', value: 1 }
+    ]
+  };
 };
 
 const AdminDashboardPage = () => {
   const { data, isLoading, error } = useQuery({
     queryKey: ['dashboard-data'],
     queryFn: fetchDashboardData,
-    refetchInterval: 5000 // Real-time update every 5 seconds
+    refetchInterval: 30000 // Real-time update every 30 seconds
   });
 
   // Calculate real-time metrics
   const totalRevenue = data?.orders?.reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0;
   const totalBookings = data?.orders?.length || 0;
   const activeJobs = data?.orders?.filter(order => order.status === 'in progress').length || 0;
+  const averageRating = data?.reviews && data.reviews.length > 0 
+    ? data.reviews.reduce((sum, review) => sum + (review.rating || 0), 0) / data.reviews.length
+    : 0;
+  const reviewCount = data?.reviews?.length || 0;
 
-  // Mock data for charts
-  const salesData = [
-    { name: 'Mon', sales: 4000 },
-    { name: 'Tue', sales: 3000 },
-    { name: 'Wed', sales: 2000 },
-    { name: 'Thu', sales: 2780 },
-    { name: 'Fri', sales: 1890 },
-    { name: 'Sat', sales: 2390 },
-    { name: 'Sun', sales: 3490 },
-  ];
+  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
-  const bookingsByCategory = [
-    { name: 'Repair', value: 400 },
-    { name: 'Installation', value: 300 },
-    { name: 'Maintenance', value: 300 },
-    { name: 'Cleaning', value: 200 },
-  ];
+  // Daily metrics
+  const dailyBookings = data?.orders?.filter(order => {
+    const today = new Date().toISOString().split('T')[0];
+    const orderDate = new Date(order.created_at || '').toISOString().split('T')[0];
+    return orderDate === today;
+  }).length || 0;
 
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
+  const dailyRevenue = data?.orders?.filter(order => {
+    const today = new Date().toISOString().split('T')[0];
+    const orderDate = new Date(order.created_at || '').toISOString().split('T')[0];
+    return orderDate === today;
+  }).reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0;
+
+  const dailyCompleted = data?.orders?.filter(order => {
+    const today = new Date().toISOString().split('T')[0];
+    const orderDate = new Date(order.created_at || '').toISOString().split('T')[0];
+    return orderDate === today && order.status === 'completed';
+  }).length || 0;
+
+  // Weekly metrics
+  const weekStart = new Date();
+  weekStart.setDate(weekStart.getDate() - 7);
+  const weekStartStr = weekStart.toISOString();
+
+  const weeklyBookings = data?.orders?.filter(order => 
+    order.created_at && order.created_at > weekStartStr
+  ).length || 0;
+
+  const weeklyRevenue = data?.orders?.filter(order => 
+    order.created_at && order.created_at > weekStartStr
+  ).reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0;
+
+  const weeklyCompleted = data?.orders?.filter(order => 
+    order.created_at && order.created_at > weekStartStr && order.status === 'completed'
+  ).length || 0;
+
+  // Monthly metrics
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  const monthStartStr = monthStart.toISOString();
+
+  const monthlyBookings = data?.orders?.filter(order => 
+    order.created_at && order.created_at > monthStartStr
+  ).length || 0;
+
+  const monthlyRevenue = data?.orders?.filter(order => 
+    order.created_at && order.created_at > monthStartStr
+  ).reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0;
+
+  const monthlyCompleted = data?.orders?.filter(order => 
+    order.created_at && order.created_at > monthStartStr && order.status === 'completed'
+  ).length || 0;
 
   return (
     <div className="space-y-6">
@@ -151,9 +253,9 @@ const AdminDashboardPage = () => {
             </svg>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">4.8/5.0</div>
+            <div className="text-2xl font-bold">{averageRating.toFixed(1)}/5.0</div>
             <p className="text-xs text-muted-foreground">
-              Based on 180 reviews
+              Based on {reviewCount} reviews
             </p>
           </CardContent>
         </Card>
@@ -170,7 +272,7 @@ const AdminDashboardPage = () => {
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
               <LineChart
-                data={salesData}
+                data={data?.dailySales || []}
                 margin={{
                   top: 5,
                   right: 30,
@@ -181,7 +283,7 @@ const AdminDashboardPage = () => {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
                 <YAxis />
-                <Tooltip />
+                <Tooltip formatter={(value) => [`₹${value}`, 'Sales']}/>
                 <Line type="monotone" dataKey="sales" stroke="#8884d8" activeDot={{ r: 8 }} />
               </LineChart>
             </ResponsiveContainer>
@@ -199,7 +301,7 @@ const AdminDashboardPage = () => {
             <ResponsiveContainer width="100%" height={250}>
               <PieChart>
                 <Pie
-                  data={bookingsByCategory}
+                  data={data?.bookingsByCategory || []}
                   cx="50%"
                   cy="50%"
                   labelLine={false}
@@ -208,7 +310,7 @@ const AdminDashboardPage = () => {
                   dataKey="value"
                   label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                 >
-                  {bookingsByCategory.map((entry, index) => (
+                  {data?.bookingsByCategory?.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
@@ -233,25 +335,25 @@ const AdminDashboardPage = () => {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <Card>
                 <CardContent className="p-6">
-                  <div className="text-2xl font-bold">15</div>
+                  <div className="text-2xl font-bold">{dailyBookings}</div>
                   <p className="text-sm text-muted-foreground">New bookings today</p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-6">
-                  <div className="text-2xl font-bold">₹12,234</div>
+                  <div className="text-2xl font-bold">₹{dailyRevenue.toFixed(0)}</div>
                   <p className="text-sm text-muted-foreground">Revenue today</p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-6">
-                  <div className="text-2xl font-bold">8</div>
+                  <div className="text-2xl font-bold">{dailyCompleted}</div>
                   <p className="text-sm text-muted-foreground">Completed jobs</p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-6">
-                  <div className="text-2xl font-bold">4.9</div>
+                  <div className="text-2xl font-bold">{averageRating.toFixed(1)}</div>
                   <p className="text-sm text-muted-foreground">Average rating today</p>
                 </CardContent>
               </Card>
@@ -261,25 +363,25 @@ const AdminDashboardPage = () => {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <Card>
                 <CardContent className="p-6">
-                  <div className="text-2xl font-bold">87</div>
+                  <div className="text-2xl font-bold">{weeklyBookings}</div>
                   <p className="text-sm text-muted-foreground">New bookings this week</p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-6">
-                  <div className="text-2xl font-bold">₹45,231</div>
+                  <div className="text-2xl font-bold">₹{weeklyRevenue.toFixed(0)}</div>
                   <p className="text-sm text-muted-foreground">Revenue this week</p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-6">
-                  <div className="text-2xl font-bold">62</div>
+                  <div className="text-2xl font-bold">{weeklyCompleted}</div>
                   <p className="text-sm text-muted-foreground">Completed jobs</p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-6">
-                  <div className="text-2xl font-bold">4.8</div>
+                  <div className="text-2xl font-bold">{averageRating.toFixed(1)}</div>
                   <p className="text-sm text-muted-foreground">Average rating this week</p>
                 </CardContent>
               </Card>
@@ -289,25 +391,25 @@ const AdminDashboardPage = () => {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <Card>
                 <CardContent className="p-6">
-                  <div className="text-2xl font-bold">245</div>
+                  <div className="text-2xl font-bold">{monthlyBookings}</div>
                   <p className="text-sm text-muted-foreground">New bookings this month</p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-6">
-                  <div className="text-2xl font-bold">₹145,231</div>
+                  <div className="text-2xl font-bold">₹{monthlyRevenue.toFixed(0)}</div>
                   <p className="text-sm text-muted-foreground">Revenue this month</p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-6">
-                  <div className="text-2xl font-bold">184</div>
+                  <div className="text-2xl font-bold">{monthlyCompleted}</div>
                   <p className="text-sm text-muted-foreground">Completed jobs</p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-6">
-                  <div className="text-2xl font-bold">4.7</div>
+                  <div className="text-2xl font-bold">{averageRating.toFixed(1)}</div>
                   <p className="text-sm text-muted-foreground">Average rating this month</p>
                 </CardContent>
               </Card>
