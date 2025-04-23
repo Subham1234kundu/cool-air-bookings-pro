@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +10,7 @@ interface OrderSummaryProps {
   totalPrice: number;
   onProceedToPayment: () => void;
   formComplete: boolean;
+  paymentMethod: 'razorpay' | 'cash';
 }
 
 export const OrderSummary = ({ 
@@ -18,7 +18,8 @@ export const OrderSummary = ({
   updateQuantity, 
   totalPrice,
   onProceedToPayment,
-  formComplete 
+  formComplete,
+  paymentMethod 
 }: OrderSummaryProps) => {
   return (
     <div className="bg-white rounded-lg shadow-sm border p-6 sticky top-20">
@@ -76,7 +77,7 @@ export const OrderSummary = ({
         disabled={!formComplete}
         onClick={onProceedToPayment}
       >
-        Proceed to Payment
+        {paymentMethod === 'cash' ? 'Confirm Order' : 'Proceed to Payment'}
       </Button>
       
       <p className="text-xs text-gray-500 mt-4 text-center">

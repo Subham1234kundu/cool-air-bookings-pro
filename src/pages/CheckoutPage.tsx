@@ -103,15 +103,22 @@ const CheckoutPage = () => {
         .update({
           payment_method: 'cash',
           payment_status: 'pending',
-          status: 'confirmed'
+          status: 'confirmed',
+          address: selectedLocation?.address,
+          latitude: selectedLocation?.latitude,
+          longitude: selectedLocation?.longitude,
+          phone: formData.phone,
+          email: formData.email,
+          fullname: formData.fullName,
+          scheduled_at: `${formData.date}T${timeMap[formData.timeSlot] || '12:00'}:00`
         })
         .eq('id', orderId);
 
       if (error) throw error;
 
       toast({
-        title: "Cash Order Confirmed",
-        description: "Your order has been placed successfully.",
+        title: "Order Confirmed",
+        description: "Your order has been placed successfully with cash on delivery.",
       });
       
       clearCart();
@@ -140,6 +147,15 @@ const CheckoutPage = () => {
       });
       return;
     }
+
+    if (!selectedLocation) {
+      toast({
+        title: "Location Required",
+        description: "Please select a delivery location before proceeding.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     try {
       const orderItems = items.map(item => ({
@@ -155,9 +171,8 @@ const CheckoutPage = () => {
         'evening': '18:00'
       };
       
-      const timeValue = timeMap[formData.timeSlot] || '12:00';
       const scheduledAt = formData.date 
-        ? `${formData.date}T${timeValue}:00` 
+        ? `${formData.date}T${timeMap[formData.timeSlot] || '12:00'}:00` 
         : new Date().toISOString();
 
       createBookingMutation.mutate({
@@ -293,6 +308,7 @@ const CheckoutPage = () => {
               totalPrice={totalPrice}
               onProceedToPayment={handleProceedToPayment}
               formComplete={formComplete}
+              paymentMethod={paymentMethod}
             />
           </div>
         </div>
@@ -303,7 +319,7 @@ const CheckoutPage = () => {
         onOpenChange={setIsLocationModalOpen}
         onSubmit={(data) => {
           createLocationMutation.mutate({
-            user_id: "",  // This will be set by the backend function
+            user_id: "",
             address: data.address,
             latitude: null,
             longitude: null,
