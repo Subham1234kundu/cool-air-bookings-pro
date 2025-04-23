@@ -1,16 +1,11 @@
-
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle,
-  DialogFooter
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
+import { useToast } from "@/hooks/use-toast";
+import { createCategory } from "@/services/supabase/categories";
 
 interface CategoryFormDialogProps {
   isOpen: boolean;
@@ -33,6 +28,29 @@ export const CategoryFormDialog: React.FC<CategoryFormDialogProps> = ({
   newCategory,
   setNewCategory,
 }) => {
+  const { toast } = useToast();
+
+  const handleSave = async () => {
+    try {
+      await createCategory({
+        name: newCategory.name,
+      });
+
+      toast({
+        title: "Category Created",
+        description: "The new category has been created successfully."
+      });
+      
+      onSave();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create category. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
@@ -70,7 +88,7 @@ export const CategoryFormDialog: React.FC<CategoryFormDialogProps> = ({
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={onSave}>
+          <Button onClick={handleSave}>
             Add Category
           </Button>
         </DialogFooter>

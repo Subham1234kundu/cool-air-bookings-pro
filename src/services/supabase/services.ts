@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
 
@@ -31,6 +30,48 @@ export async function toggleServiceStatus(serviceId: number, isActive: boolean) 
     .select()
     .single();
   
+  if (error) throw error;
+  return data;
+}
+
+export async function createService(serviceData: {
+  name: string;
+  description: string;
+  price: number;
+  category_id: number;
+  duration_minutes: number;
+  is_active: boolean;
+  image_url?: string;
+}) {
+  const { data, error } = await supabase
+    .from('services')
+    .insert(serviceData)
+    .select()
+    .single();
+    
+  if (error) throw error;
+  return data;
+}
+
+export async function updateService(
+  id: number,
+  serviceData: {
+    name: string;
+    description: string;
+    price: number;
+    category_id: number;
+    duration_minutes: number;
+    is_active: boolean;
+    image_url?: string;
+  }
+) {
+  const { data, error } = await supabase
+    .from('services')
+    .update(serviceData)
+    .eq('id', id)
+    .select()
+    .single();
+    
   if (error) throw error;
   return data;
 }

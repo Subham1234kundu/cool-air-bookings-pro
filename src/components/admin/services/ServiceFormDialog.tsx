@@ -1,25 +1,14 @@
-
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle,
-  DialogFooter
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tables } from "@/integrations/supabase/types";
+import { useToast } from "@/hooks/use-toast";
+import { createService, updateService } from "@/services/supabase/services";
 
 interface ServiceFormDialogProps {
   isOpen: boolean;
@@ -58,6 +47,44 @@ export const ServiceFormDialog: React.FC<ServiceFormDialogProps> = ({
   categories,
   selectedService
 }) => {
+  const { toast } = useToast();
+
+  const handleSave = async () => {
+    try {
+      const serviceData = {
+        name: editForm.name,
+        description: editForm.description,
+        price: editForm.price,
+        category_id: editForm.categoryId,
+        duration_minutes: parseInt(editForm.duration),
+        is_active: editForm.isActive,
+        image_url: editForm.image
+      };
+
+      if (selectedService) {
+        await updateService(selectedService.id, serviceData);
+        toast({
+          title: "Service Updated",
+          description: "The service has been updated successfully."
+        });
+      } else {
+        await createService(serviceData);
+        toast({
+          title: "Service Created",
+          description: "The new service has been created successfully."
+        });
+      }
+
+      onSave();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save service. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-lg">
@@ -155,7 +182,7 @@ export const ServiceFormDialog: React.FC<ServiceFormDialogProps> = ({
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={onSave}>
+          <Button onClick={handleSave}>
             {selectedService ? 'Update' : 'Add'} Service
           </Button>
         </DialogFooter>

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { PlusCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -103,18 +102,20 @@ const AdminServicesPage = () => {
   const handleEditService = (service: Tables<'services'>) => {
     setSelectedService(service);
     setEditForm({
-      ...service,
+      id: service.id,
+      name: service.name,
+      description: service.description || '',
+      price: service.price,
       categoryId: service.category_id || 1,
+      duration: service.duration_minutes?.toString() || '',
       isActive: service.is_active || true,
-      duration: service.duration_minutes?.toString() || ''
+      image: service.image_url || '/placeholder.svg'
     });
   };
   
   const handleSaveService = () => {
-    // This would save to Supabase in a real implementation
     console.log('Saving service:', editForm);
     
-    // Close the dialog
     if (selectedService) {
       setSelectedService(null);
     } else {
@@ -123,10 +124,8 @@ const AdminServicesPage = () => {
   };
   
   const handleSaveCategory = () => {
-    // This would save to Supabase in a real implementation
     console.log('Saving category:', newCategory);
     
-    // Close the dialog
     setIsAddingCategory(false);
   };
   
