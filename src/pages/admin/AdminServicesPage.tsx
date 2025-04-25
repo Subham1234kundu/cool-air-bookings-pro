@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,7 +5,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Table, 
   TableBody, 
-  TableCaption, 
   TableCell, 
   TableHead, 
   TableHeader, 
@@ -29,11 +27,20 @@ const AdminServicesPage = () => {
   const [isCategoryFormOpen, setIsCategoryFormOpen] = useState(false);
   const [editingService, setEditingService] = useState<Tables<'services'> | null>(null);
   const [editingCategory, setEditingCategory] = useState<Tables<'categories'> | null>(null);
+  const [editForm, setEditForm] = useState({
+    id: 0,
+    name: '',
+    description: '',
+    price: 0,
+    categoryId: 1,
+    duration: '30',
+    isActive: true,
+    image: ''
+  });
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Queries for fetching data
   const { 
     data: services = [], 
     isLoading: servicesLoading 
@@ -50,7 +57,32 @@ const AdminServicesPage = () => {
     queryFn: fetchCategories
   });
 
-  // Mutations for creating/updating services
+  useEffect(() => {
+    if (editingService) {
+      setEditForm({
+        id: editingService.id,
+        name: editingService.name || '',
+        description: editingService.description || '',
+        price: editingService.price || 0,
+        categoryId: editingService.category_id || 1,
+        duration: editingService.duration_minutes?.toString() || '30',
+        isActive: editingService.is_active ?? true,
+        image: editingService.image_url || ''
+      });
+    } else {
+      setEditForm({
+        id: 0,
+        name: '',
+        description: '',
+        price: 0,
+        categoryId: categories[0]?.id || 1,
+        duration: '30',
+        isActive: true,
+        image: ''
+      });
+    }
+  }, [editingService, categories]);
+
   const createServiceMutation = useMutation({
     mutationFn: createService,
     onSuccess: () => {
@@ -92,7 +124,6 @@ const AdminServicesPage = () => {
     }
   });
 
-  // Mutations for creating/updating categories
   const createCategoryMutation = useMutation({
     mutationFn: createCategory,
     onSuccess: () => {
@@ -134,56 +165,18 @@ const AdminServicesPage = () => {
     }
   });
 
-  // Handle service form submission
-  const handleServiceSubmit = async (data: any) => {
-    try {
-      // Handle image upload if there is a file
-      if (data.imageFile) {
-        const imageUrl = await uploadServiceImage(data.imageFile);
-        data.image_url = imageUrl;
-      }
-
-      if (editingService) {
-        updateServiceMutation.mutate({
-          id: editingService.id,
-          serviceData: {
-            name: data.name,
-            price: parseFloat(data.price),
-            description: data.description,
-            category_id: parseInt(data.category_id),
-            duration_minutes: parseInt(data.duration),
-            image_url: data.image_url || editingService.image_url,
-            is_active: data.is_active
-          }
-        });
-      } else {
-        createServiceMutation.mutate({
-          name: data.name,
-          price: parseFloat(data.price),
-          description: data.description,
-          category_id: parseInt(data.category_id),
-          duration_minutes: parseInt(data.duration),
-          image_url: data.image_url,
-          is_active: data.is_active
-        });
-      }
-    } catch (error) {
-      console.error("Error processing service form:", error);
-      toast({
-        title: "Error",
-        description: "There was an error processing your request.",
-        variant: "destructive",
-      });
-    }
+  const handleServiceSubmit = async () => {
+    queryClient.invalidateQueries({ queryKey: ['admin-services'] });
+    setIsServiceFormOpen(false);
+    setEditingService(null);
   };
 
-  // Handle category form submission
   const handleCategorySubmit = async (data: any) => {
     try {
-      // Handle image upload if there is a file
+      let imageUrl = editingCategory?.image_url || '';
+      
       if (data.imageFile) {
-        const imageUrl = await uploadServiceImage(data.imageFile);
-        data.image_url = imageUrl;
+        imageUrl = await uploadServiceImage(data.imageFile);
       }
 
       if (editingCategory) {
@@ -192,14 +185,14 @@ const AdminServicesPage = () => {
           categoryData: {
             name: data.name,
             description: data.description,
-            image_url: data.image_url || editingCategory.image_url
+            image_url: imageUrl
           }
         });
       } else {
         createCategoryMutation.mutate({
           name: data.name,
           description: data.description,
-          image_url: data.image_url
+          image_url: imageUrl
         });
       }
     } catch (error) {
@@ -212,25 +205,20 @@ const AdminServicesPage = () => {
     }
   };
 
-  // Handle edit service
   const handleEditService = (service: Tables<'services'>) => {
     setEditingService(service);
     setIsServiceFormOpen(true);
   };
 
-  // Handle edit category
   const handleEditCategory = (category: Tables<'categories'>) => {
     setEditingCategory(category);
     setIsCategoryFormOpen(true);
   };
   
-  // Handle delete service
   const handleDeleteService = (serviceId: number) => {
-    // This function would be implemented if delete functionality is needed
     console.log("Delete service:", serviceId);
   };
 
-  // Filter services based on search query
   const filteredServices = services.filter((service) => 
     service.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -333,7 +321,7 @@ const AdminServicesPage = () => {
                 ) : (
                   categories.map((category) => (
                     <TableRow key={category.id}>
-                      <TableCell className="font-medium">{category.name}</TableCell>
+                      <TableCell className="font-medium">{category.name || "Unnamed Category"}</TableCell>
                       <TableCell>{category.description}</TableCell>
                       <TableCell>
                         {services.filter((s) => s.category_id === category.id).length}
@@ -357,19 +345,32 @@ const AdminServicesPage = () => {
       </Tabs>
 
       <ServiceFormDialog
-        open={isServiceFormOpen}
-        onOpenChange={setIsServiceFormOpen}
-        onSubmit={handleServiceSubmit}
+        isOpen={isServiceFormOpen}
+        onClose={() => {
+          setIsServiceFormOpen(false);
+          setEditingService(null);
+        }}
+        onSave={handleServiceSubmit}
         categories={categories}
-        service={editingService}
+        selectedService={editingService}
+        editForm={editForm}
+        setEditForm={setEditForm}
       />
 
       <CategoryFormDialog
         isOpen={isCategoryFormOpen}
-        onClose={() => setIsCategoryFormOpen(false)}
+        onClose={() => {
+          setIsCategoryFormOpen(false);
+          setEditingCategory(null);
+        }}
         onSave={handleCategorySubmit}
-        newCategory={editingCategory || { name: '', isActive: true }}
-        setNewCategory={setEditingCategory}
+        newCategory={{
+          id: editingCategory?.id,
+          name: editingCategory?.name || '',
+          description: editingCategory?.description || '',
+          image_url: editingCategory?.image_url || ''
+        }}
+        setNewCategory={(value) => setEditingCategory(value as any)}
       />
     </div>
   );
