@@ -46,7 +46,7 @@ export const ServiceFormDialog: React.FC<ServiceFormDialogProps> = ({
   onSave,
   editForm,
   setEditForm,
-  categories = [], // Provide a default empty array
+  categories,
   selectedService
 }) => {
   const { toast } = useToast();
@@ -54,35 +54,14 @@ export const ServiceFormDialog: React.FC<ServiceFormDialogProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
-  // Reset state when dialog opens/closes or service changes
+  // Initialize the form properly when the dialog opens or the selected service changes
   useEffect(() => {
     if (selectedService) {
-      setEditForm({
-        id: selectedService.id || 0,
-        name: selectedService.name || '',
-        description: selectedService.description || '',
-        price: selectedService.price || 0,
-        categoryId: selectedService.category_id || (categories[0]?.id || 1),
-        duration: selectedService.duration_minutes?.toString() || '30',
-        isActive: selectedService.is_active ?? true,
-        image: selectedService.image_url || ''
-      });
       setImagePreview(selectedService.image_url || null);
     } else {
-      setEditForm({
-        id: 0,
-        name: '',
-        description: '',
-        price: 0,
-        categoryId: categories[0]?.id || 1,
-        duration: '30',
-        isActive: true,
-        image: ''
-      });
       setImagePreview(null);
     }
-    setImageFile(null);
-  }, [selectedService, isOpen, categories, setEditForm]);
+  }, [selectedService, isOpen]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -90,6 +69,7 @@ export const ServiceFormDialog: React.FC<ServiceFormDialogProps> = ({
     
     setImageFile(file);
     
+    // Create preview
     const reader = new FileReader();
     reader.onloadend = () => {
       setImagePreview(reader.result as string);
@@ -128,6 +108,7 @@ export const ServiceFormDialog: React.FC<ServiceFormDialogProps> = ({
       
       let imageUrl = editForm.image;
       
+      // Upload image if there's a new file
       if (imageFile) {
         const uploadedUrl = await uploadImage(imageFile);
         if (uploadedUrl) {
@@ -166,9 +147,7 @@ export const ServiceFormDialog: React.FC<ServiceFormDialogProps> = ({
       }
 
       onSave();
-      onClose();
     } catch (error) {
-      console.error('Error saving service:', error);
       toast({
         title: "Error",
         description: "Failed to save service. Please try again.",
@@ -180,11 +159,7 @@ export const ServiceFormDialog: React.FC<ServiceFormDialogProps> = ({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={() => {
-      onClose();
-      setImageFile(null);
-      setImagePreview(null);
-    }}>
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>{selectedService ? 'Edit Service' : 'Add New Service'}</DialogTitle>
@@ -197,8 +172,7 @@ export const ServiceFormDialog: React.FC<ServiceFormDialogProps> = ({
               id="name" 
               value={editForm.name} 
               onChange={(e) => setEditForm({...editForm, name: e.target.value})} 
-              className="col-span-3"
-              required 
+              className="col-span-3" 
             />
           </div>
           
@@ -228,8 +202,7 @@ export const ServiceFormDialog: React.FC<ServiceFormDialogProps> = ({
               type="number" 
               value={editForm.price} 
               onChange={(e) => setEditForm({...editForm, price: parseFloat(e.target.value) || 0})} 
-              className="col-span-3"
-              required
+              className="col-span-3" 
             />
           </div>
           
@@ -237,11 +210,9 @@ export const ServiceFormDialog: React.FC<ServiceFormDialogProps> = ({
             <Label htmlFor="duration" className="col-span-1">Duration (min)</Label>
             <Input 
               id="duration" 
-              type="number"
               value={editForm.duration} 
               onChange={(e) => setEditForm({...editForm, duration: e.target.value})} 
-              className="col-span-3"
-              required 
+              className="col-span-3" 
             />
           </div>
           

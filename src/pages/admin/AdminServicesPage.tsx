@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -5,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Table, 
   TableBody, 
+  TableCaption, 
   TableCell, 
   TableHead, 
   TableHeader, 
@@ -41,6 +43,7 @@ const AdminServicesPage = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Queries for fetching data
   const { 
     data: services = [], 
     isLoading: servicesLoading 
@@ -57,6 +60,7 @@ const AdminServicesPage = () => {
     queryFn: fetchCategories
   });
 
+  // Set the edit form data when editing service changes
   useEffect(() => {
     if (editingService) {
       setEditForm({
@@ -70,6 +74,7 @@ const AdminServicesPage = () => {
         image: editingService.image_url || ''
       });
     } else {
+      // Reset form for new service
       setEditForm({
         id: 0,
         name: '',
@@ -83,6 +88,7 @@ const AdminServicesPage = () => {
     }
   }, [editingService, categories]);
 
+  // Mutations for creating/updating services
   const createServiceMutation = useMutation({
     mutationFn: createService,
     onSuccess: () => {
@@ -124,6 +130,7 @@ const AdminServicesPage = () => {
     }
   });
 
+  // Mutations for creating/updating categories
   const createCategoryMutation = useMutation({
     mutationFn: createCategory,
     onSuccess: () => {
@@ -165,18 +172,20 @@ const AdminServicesPage = () => {
     }
   });
 
+  // Handle service form submission
   const handleServiceSubmit = async () => {
     queryClient.invalidateQueries({ queryKey: ['admin-services'] });
     setIsServiceFormOpen(false);
     setEditingService(null);
   };
 
+  // Handle category form submission
   const handleCategorySubmit = async (data: any) => {
     try {
-      let imageUrl = editingCategory?.image_url || '';
-      
+      // Handle image upload if there is a file
       if (data.imageFile) {
-        imageUrl = await uploadServiceImage(data.imageFile);
+        const imageUrl = await uploadServiceImage(data.imageFile);
+        data.image_url = imageUrl;
       }
 
       if (editingCategory) {
@@ -185,14 +194,14 @@ const AdminServicesPage = () => {
           categoryData: {
             name: data.name,
             description: data.description,
-            image_url: imageUrl
+            image_url: data.image_url || editingCategory.image_url
           }
         });
       } else {
         createCategoryMutation.mutate({
           name: data.name,
           description: data.description,
-          image_url: imageUrl
+          image_url: data.image_url
         });
       }
     } catch (error) {
@@ -205,20 +214,25 @@ const AdminServicesPage = () => {
     }
   };
 
+  // Handle edit service
   const handleEditService = (service: Tables<'services'>) => {
     setEditingService(service);
     setIsServiceFormOpen(true);
   };
 
+  // Handle edit category
   const handleEditCategory = (category: Tables<'categories'>) => {
     setEditingCategory(category);
     setIsCategoryFormOpen(true);
   };
   
+  // Handle delete service
   const handleDeleteService = (serviceId: number) => {
+    // This function would be implemented if delete functionality is needed
     console.log("Delete service:", serviceId);
   };
 
+  // Filter services based on search query
   const filteredServices = services.filter((service) => 
     service.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -346,10 +360,7 @@ const AdminServicesPage = () => {
 
       <ServiceFormDialog
         isOpen={isServiceFormOpen}
-        onClose={() => {
-          setIsServiceFormOpen(false);
-          setEditingService(null);
-        }}
+        onClose={() => setIsServiceFormOpen(false)}
         onSave={handleServiceSubmit}
         categories={categories}
         selectedService={editingService}
@@ -359,18 +370,10 @@ const AdminServicesPage = () => {
 
       <CategoryFormDialog
         isOpen={isCategoryFormOpen}
-        onClose={() => {
-          setIsCategoryFormOpen(false);
-          setEditingCategory(null);
-        }}
+        onClose={() => setIsCategoryFormOpen(false)}
         onSave={handleCategorySubmit}
-        newCategory={{
-          id: editingCategory?.id,
-          name: editingCategory?.name || '',
-          description: editingCategory?.description || '',
-          image_url: editingCategory?.image_url || ''
-        }}
-        setNewCategory={(value) => setEditingCategory(value as any)}
+        newCategory={editingCategory || { name: '', description: '', isActive: true }}
+        setNewCategory={setEditingCategory}
       />
     </div>
   );
