@@ -39,22 +39,26 @@ export const GoogleMap = ({
 
   useEffect(() => {
     if (map && location) {
+      // Clear any previous markers
+      if (marker) {
+        marker.setMap(null);
+      }
+
       const position = new google.maps.LatLng(location.latitude, location.longitude);
       map.setCenter(position);
+      map.setZoom(15); // Set an appropriate zoom level
       
-      if (marker) {
-        marker.setPosition(position);
-      } else {
-        const newMarker = new google.maps.Marker({
-          position,
-          map,
-          draggable: !readOnly
-        });
-        setMarker(newMarker);
+      // Create a new marker
+      const newMarker = new google.maps.Marker({
+        position,
+        map,
+        draggable: !readOnly,
+        animation: google.maps.Animation.DROP
+      });
+      setMarker(newMarker);
 
-        if (!readOnly) {
-          newMarker.addListener('dragend', handleMarkerDragEnd);
-        }
+      if (!readOnly && onLocationSelect) {
+        newMarker.addListener('dragend', handleMarkerDragEnd);
       }
     }
   }, [map, location]);
@@ -68,9 +72,11 @@ export const GoogleMap = ({
         lat: defaultLocation.latitude, 
         lng: defaultLocation.longitude 
       },
-      zoom: 14,
+      zoom: 15,
       mapTypeControl: false,
-      streetViewControl: false
+      streetViewControl: false,
+      fullscreenControl: true,
+      zoomControl: true
     };
 
     const newMap = new google.maps.Map(mapRef.current, mapOptions);
@@ -128,7 +134,34 @@ export const GoogleMap = ({
       (results, status) => {
         if (status === 'OK' && results && results[0]) {
           const address = results[0].formatted_address;
-          onLocationSelect(lat, lng, address);
+          
+          // Extract detailed components if possible
+          let detailedAddress = address;
+          const addressComponents = results[0].address_components;
+          if (addressComponents) {
+            // Try to construct a more readable address with key components
+            const buildingName = addressComponents.find(c => c.types.includes('premise') || c.types.includes('subpremise'))?.long_name;
+            const streetNumber = addressComponents.find(c => c.types.includes('street_number'))?.long_name;
+            const route = addressComponents.find(c => c.types.includes('route'))?.long_name;
+            const locality = addressComponents.find(c => c.types.includes('locality'))?.long_name;
+            const sublocality = addressComponents.find(c => c.types.includes('sublocality'))?.long_name;
+            const postalCode = addressComponents.find(c => c.types.includes('postal_code'))?.long_name;
+
+            // Construct a more detailed address
+            const addressParts = [];
+            if (buildingName) addressParts.push(buildingName);
+            if (streetNumber && route) addressParts.push(`${streetNumber} ${route}`);
+            else if (route) addressParts.push(route);
+            if (sublocality && sublocality !== locality) addressParts.push(sublocality);
+            if (locality) addressParts.push(locality);
+            if (postalCode) addressParts.push(postalCode);
+
+            if (addressParts.length > 0) {
+              detailedAddress = addressParts.join(', ');
+            }
+          }
+          
+          onLocationSelect(lat, lng, detailedAddress);
         } else {
           onLocationSelect(lat, lng, "Unknown location");
         }

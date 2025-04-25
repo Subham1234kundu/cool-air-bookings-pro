@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   Table, 
@@ -113,7 +112,6 @@ const AdminBookingsPage = () => {
         status: newStatus
       });
       
-      // Update local state for immediate UI feedback
       setSelectedBooking({
         ...selectedBooking,
         status: newStatus
@@ -125,6 +123,12 @@ const AdminBookingsPage = () => {
     if (selectedBooking && selectedBooking.latitude && selectedBooking.longitude) {
       const url = `https://www.google.com/maps/search/?api=1&query=${selectedBooking.latitude},${selectedBooking.longitude}`;
       window.open(url, '_blank');
+      
+      console.log('Opening location in Google Maps:', {
+        latitude: selectedBooking.latitude,
+        longitude: selectedBooking.longitude,
+        address: selectedBooking.address
+      });
     } else {
       toast({
         title: "No Location Data",
@@ -237,7 +241,6 @@ const AdminBookingsPage = () => {
         </div>
       </div>
       
-      {/* Booking Details Dialog */}
       {selectedBooking && (
         <Dialog open={!!selectedBooking} onOpenChange={() => setSelectedBooking(null)}>
           <DialogContent className="max-w-3xl">
@@ -414,7 +417,12 @@ const AdminBookingsPage = () => {
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <h3 className="text-lg font-medium">Customer Location</h3>
-                    <Button onClick={openInGoogleMaps} disabled={!selectedBooking.latitude || !selectedBooking.longitude}>
+                    <Button 
+                      onClick={openInGoogleMaps} 
+                      disabled={!selectedBooking.latitude || !selectedBooking.longitude}
+                      className="flex items-center gap-2"
+                    >
+                      <MapPin className="h-4 w-4" />
                       Open in Google Maps
                     </Button>
                   </div>
@@ -434,6 +442,9 @@ const AdminBookingsPage = () => {
                         <div className="text-center">
                           <MapPin className="mx-auto h-10 w-10 text-gray-400" />
                           <p className="mt-2 text-gray-500">No location data available</p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            The customer did not provide location coordinates
+                          </p>
                         </div>
                       </div>
                     )}
@@ -444,7 +455,9 @@ const AdminBookingsPage = () => {
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Address:</span>
-                        <span className="font-medium">{selectedBooking.address || "Not available"}</span>
+                        <span className="font-medium max-w-[70%] text-right">
+                          {selectedBooking.address || "Not available"}
+                        </span>
                       </div>
                       {selectedBooking.latitude && selectedBooking.longitude && (
                         <div className="flex justify-between">

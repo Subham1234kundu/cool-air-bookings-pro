@@ -56,13 +56,41 @@ export const getCurrentLocation = (): Promise<{
           const data = await response.json();
           console.log('Geocoding response:', data);
           
-          const address = data.results[0]?.formatted_address;
-          console.log('Formatted address:', address);
+          // Extract full formatted address
+          const formattedAddress = data.results[0]?.formatted_address;
+
+          // Extract detailed address components for more structured data
+          let detailedAddress = formattedAddress;
+          if (data.results[0]?.address_components) {
+            const addressComponents = data.results[0].address_components;
+            // Try to construct a more readable address with key components
+            const buildingName = addressComponents.find(c => c.types.includes('premise') || c.types.includes('subpremise'))?.long_name;
+            const streetNumber = addressComponents.find(c => c.types.includes('street_number'))?.long_name;
+            const route = addressComponents.find(c => c.types.includes('route'))?.long_name;
+            const locality = addressComponents.find(c => c.types.includes('locality'))?.long_name;
+            const sublocality = addressComponents.find(c => c.types.includes('sublocality'))?.long_name;
+            const postalCode = addressComponents.find(c => c.types.includes('postal_code'))?.long_name;
+
+            // Construct a more detailed address
+            const addressParts = [];
+            if (buildingName) addressParts.push(buildingName);
+            if (streetNumber && route) addressParts.push(`${streetNumber} ${route}`);
+            else if (route) addressParts.push(route);
+            if (sublocality && sublocality !== locality) addressParts.push(sublocality);
+            if (locality) addressParts.push(locality);
+            if (postalCode) addressParts.push(postalCode);
+
+            if (addressParts.length > 0) {
+              detailedAddress = addressParts.join(', ');
+            }
+          }
+          
+          console.log('Detailed address:', detailedAddress);
 
           resolve({
             latitude,
             longitude,
-            address
+            address: detailedAddress || formattedAddress
           });
         } catch (error) {
           console.error('Geocoding error:', error);
