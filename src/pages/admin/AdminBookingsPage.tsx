@@ -33,6 +33,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Calendar, Clock, MapPin, Search, User, Package } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { GoogleMap } from '@/components/maps/GoogleMap';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const fetchAllBookings = async () => {
   const { data, error } = await supabase
@@ -115,6 +117,19 @@ const AdminBookingsPage = () => {
       setSelectedBooking({
         ...selectedBooking,
         status: newStatus
+      });
+    }
+  };
+
+  const openInGoogleMaps = () => {
+    if (selectedBooking && selectedBooking.latitude && selectedBooking.longitude) {
+      const url = `https://www.google.com/maps/search/?api=1&query=${selectedBooking.latitude},${selectedBooking.longitude}`;
+      window.open(url, '_blank');
+    } else {
+      toast({
+        title: "No Location Data",
+        description: "This booking doesn't have location coordinates.",
+        variant: "destructive",
       });
     }
   };
@@ -233,167 +248,217 @@ const AdminBookingsPage = () => {
               </DialogDescription>
             </DialogHeader>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-lg font-medium flex items-center gap-2">
-                    <User className="h-5 w-5" /> Customer Information
-                  </h3>
-                  <div className="grid gap-1 mt-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">User ID:</span>
-                      <span className="font-medium">{selectedBooking.user_id}</span>
-                    </div>
-                    {/* We'll pull contact info from database when fetching bookings */}
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Email:</span>
-                      <span className="font-medium">{selectedBooking.email || "Not available"}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Phone:</span>
-                      <span className="font-medium">{selectedBooking.phone || "Not available"}</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div>
-                  <h3 className="text-lg font-medium flex items-center gap-2">
-                    <Calendar className="h-5 w-5" /> Appointment Details
-                  </h3>
-                  <div className="grid gap-1 mt-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Date:</span>
-                      <span className="font-medium">
-                        {selectedBooking.scheduled_at 
-                          ? new Date(selectedBooking.scheduled_at).toLocaleDateString() 
-                          : "Not scheduled"}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Time:</span>
-                      <span className="font-medium">
-                        {selectedBooking.scheduled_at 
-                          ? new Date(selectedBooking.scheduled_at).toLocaleTimeString() 
-                          : "Not scheduled"}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Status:</span>
-                      <span className="font-medium">{selectedBooking.status || "Pending"}</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div>
-                  <h3 className="text-lg font-medium flex items-center gap-2">
-                    <Package className="h-5 w-5" /> Services
-                  </h3>
-                  <div className="mt-2 space-y-2">
-                    {selectedBooking.order_items && selectedBooking.order_items.map((item: any, index: number) => (
-                      <div key={index} className="flex justify-between text-sm">
-                        <span>{item.service_name}</span>
-                        <span className="font-medium">₹{item.unit_price.toFixed(2)} x {item.quantity}</span>
-                      </div>
-                    ))}
-                    <div className="flex justify-between text-sm font-semibold border-t pt-2">
-                      <span>Total:</span>
-                      <span>₹{selectedBooking.total_amount?.toFixed(2) || "0.00"}</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div>
-                  <h3 className="text-lg font-medium">Payment Information</h3>
-                  <div className="grid gap-1 mt-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Status:</span>
-                      <span className={`font-medium ${selectedBooking.payment_status === 'paid' ? 'text-green-600' : 'text-yellow-600'}`}>
-                        {selectedBooking.payment_status || "Unpaid"}
-                      </span>
-                    </div>
-                    {selectedBooking.payment_id && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Transaction ID:</span>
-                        <span className="font-medium">{selectedBooking.payment_id}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+            <Tabs defaultValue="details">
+              <TabsList className="grid grid-cols-2">
+                <TabsTrigger value="details">Booking Details</TabsTrigger>
+                <TabsTrigger value="location">Location</TabsTrigger>
+              </TabsList>
               
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-lg font-medium flex items-center gap-2">
-                    <MapPin className="h-5 w-5" /> Service Address
-                  </h3>
-                  <p className="text-sm mt-1">{selectedBooking.address || "No address provided"}</p>
-                  
-                  {/* Map placeholder - replace with actual Google Map in production */}
-                  <div className="mt-2 border rounded-md bg-slate-100 h-48 flex items-center justify-center">
-                    {selectedBooking.latitude && selectedBooking.longitude ? (
-                      <p className="text-muted-foreground text-sm">
-                        Location: {selectedBooking.latitude}, {selectedBooking.longitude}
-                      </p>
-                    ) : (
-                      <p className="text-muted-foreground text-sm">No location coordinates available</p>
-                    )}
+              <TabsContent value="details">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-lg font-medium flex items-center gap-2">
+                        <User className="h-5 w-5" /> Customer Information
+                      </h3>
+                      <div className="grid gap-1 mt-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">User ID:</span>
+                          <span className="font-medium">{selectedBooking.user_id}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Email:</span>
+                          <span className="font-medium">{selectedBooking.email || "Not available"}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Phone:</span>
+                          <span className="font-medium">{selectedBooking.phone || "Not available"}</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <h3 className="text-lg font-medium flex items-center gap-2">
+                        <Calendar className="h-5 w-5" /> Appointment Details
+                      </h3>
+                      <div className="grid gap-1 mt-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Date:</span>
+                          <span className="font-medium">
+                            {selectedBooking.scheduled_at 
+                              ? new Date(selectedBooking.scheduled_at).toLocaleDateString() 
+                              : "Not scheduled"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Time:</span>
+                          <span className="font-medium">
+                            {selectedBooking.scheduled_at 
+                              ? new Date(selectedBooking.scheduled_at).toLocaleTimeString() 
+                              : "Not scheduled"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Status:</span>
+                          <span className="font-medium">{selectedBooking.status || "Pending"}</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <h3 className="text-lg font-medium flex items-center gap-2">
+                        <Package className="h-5 w-5" /> Services
+                      </h3>
+                      <div className="mt-2 space-y-2">
+                        {selectedBooking.order_items && selectedBooking.order_items.map((item: any, index: number) => (
+                          <div key={index} className="flex justify-between text-sm">
+                            <span>{item.service_name}</span>
+                            <span className="font-medium">₹{item.unit_price.toFixed(2)} x {item.quantity}</span>
+                          </div>
+                        ))}
+                        <div className="flex justify-between text-sm font-semibold border-t pt-2">
+                          <span>Total:</span>
+                          <span>₹{selectedBooking.total_amount?.toFixed(2) || "0.00"}</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <h3 className="text-lg font-medium">Payment Information</h3>
+                      <div className="grid gap-1 mt-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Status:</span>
+                          <span className={`font-medium ${selectedBooking.payment_status === 'paid' ? 'text-green-600' : 'text-yellow-600'}`}>
+                            {selectedBooking.payment_status || "Unpaid"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Method:</span>
+                          <span className="font-medium capitalize">{selectedBooking.payment_method || "Not specified"}</span>
+                        </div>
+                        {selectedBooking.payment_id && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Transaction ID:</span>
+                            <span className="font-medium">{selectedBooking.payment_id}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
-                
-                <div>
-                  <h3 className="text-lg font-medium">Update Status</h3>
-                  <div className="flex flex-col gap-2 mt-2">
-                    <p className="text-sm text-muted-foreground">Current status: <span className="font-medium">{selectedBooking.status || "Pending"}</span></p>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button
-                        variant={selectedBooking.status === 'pending' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => updateStatus('pending')}
-                        disabled={selectedBooking.status === 'pending'}
-                      >
-                        Pending
-                      </Button>
-                      <Button
-                        variant={selectedBooking.status === 'confirmed' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => updateStatus('confirmed')}
-                        disabled={selectedBooking.status === 'confirmed'}
-                      >
-                        Confirmed
-                      </Button>
-                      <Button
-                        variant={selectedBooking.status === 'in progress' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => updateStatus('in progress')}
-                        disabled={selectedBooking.status === 'in progress'}
-                      >
-                        In Progress
-                      </Button>
-                      <Button
-                        variant={selectedBooking.status === 'completed' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => updateStatus('completed')}
-                        disabled={selectedBooking.status === 'completed'}
-                      >
-                        Completed
-                      </Button>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-lg font-medium flex items-center gap-2">
+                        <MapPin className="h-5 w-5" /> Service Address
+                      </h3>
+                      <p className="text-sm mt-1">{selectedBooking.address || "No address provided"}</p>
+                    </div>
+                    
+                    <div>
+                      <h3 className="text-lg font-medium">Update Status</h3>
+                      <div className="flex flex-col gap-2 mt-2">
+                        <p className="text-sm text-muted-foreground">Current status: <span className="font-medium">{selectedBooking.status || "Pending"}</span></p>
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button
+                            variant={selectedBooking.status === 'pending' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => updateStatus('pending')}
+                            disabled={selectedBooking.status === 'pending'}
+                          >
+                            Pending
+                          </Button>
+                          <Button
+                            variant={selectedBooking.status === 'confirmed' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => updateStatus('confirmed')}
+                            disabled={selectedBooking.status === 'confirmed'}
+                          >
+                            Confirmed
+                          </Button>
+                          <Button
+                            variant={selectedBooking.status === 'in progress' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => updateStatus('in progress')}
+                            disabled={selectedBooking.status === 'in progress'}
+                          >
+                            In Progress
+                          </Button>
+                          <Button
+                            variant={selectedBooking.status === 'completed' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => updateStatus('completed')}
+                            disabled={selectedBooking.status === 'completed'}
+                          >
+                            Completed
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <h3 className="text-lg font-medium">Actions</h3>
+                      <div className="flex gap-2 mt-2">
+                        <Button variant="outline" size="sm" className="flex-1">
+                          Contact Customer
+                        </Button>
+                        <Button variant="outline" size="sm" className="flex-1">
+                          Send Reminder
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
-                
-                <div>
-                  <h3 className="text-lg font-medium">Actions</h3>
-                  <div className="flex gap-2 mt-2">
-                    <Button variant="outline" size="sm" className="flex-1">
-                      Contact Customer
-                    </Button>
-                    <Button variant="outline" size="sm" className="flex-1">
-                      Send Reminder
+              </TabsContent>
+              
+              <TabsContent value="location">
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-medium">Customer Location</h3>
+                    <Button onClick={openInGoogleMaps} disabled={!selectedBooking.latitude || !selectedBooking.longitude}>
+                      Open in Google Maps
                     </Button>
                   </div>
+                  
+                  <div className="h-72 border rounded-md overflow-hidden">
+                    {selectedBooking.latitude && selectedBooking.longitude ? (
+                      <GoogleMap 
+                        location={{
+                          latitude: selectedBooking.latitude,
+                          longitude: selectedBooking.longitude
+                        }}
+                        height="100%"
+                        readOnly={true}
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center h-full bg-gray-100">
+                        <div className="text-center">
+                          <MapPin className="mx-auto h-10 w-10 text-gray-400" />
+                          <p className="mt-2 text-gray-500">No location data available</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-medium mb-2">Location Details</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Address:</span>
+                        <span className="font-medium">{selectedBooking.address || "Not available"}</span>
+                      </div>
+                      {selectedBooking.latitude && selectedBooking.longitude && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Coordinates:</span>
+                          <span className="font-medium">
+                            {selectedBooking.latitude.toFixed(6)}, {selectedBooking.longitude.toFixed(6)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+              </TabsContent>
+            </Tabs>
             
             <DialogFooter>
               <Button variant="outline" onClick={() => setSelectedBooking(null)}>Close</Button>

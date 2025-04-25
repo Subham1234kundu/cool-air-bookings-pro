@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { MapPin, Search, ShoppingCart, LogIn } from "lucide-react";
 import { useCart } from "@/context/CartContext";
@@ -20,11 +20,23 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
+import { LocationModal } from "@/components/home/LocationModal";
+import { useQuery } from "@tanstack/react-query";
+import { fetchUserLocations } from "@/services/supabase/locations";
 
 export function Navbar() {
   const { totalItems } = useCart();
   const { user, profile, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  
+  const { data: userLocations } = useQuery({
+    queryKey: ['userLocations'],
+    queryFn: fetchUserLocations,
+    enabled: !!user,
+  });
+
+  const defaultLocation = userLocations?.find(loc => loc.is_default) || userLocations?.[0];
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -53,10 +65,13 @@ export function Navbar() {
           </div>
 
           {/* Location Selector */}
-          <div className="hidden md:flex items-center space-x-2 text-sm text-gray-700 mr-4 cursor-pointer">
+          <div 
+            className="hidden md:flex items-center space-x-2 text-sm text-gray-700 mr-4 cursor-pointer"
+            onClick={() => setIsLocationModalOpen(true)}
+          >
             <MapPin className="h-4 w-4" />
             <span className="max-w-[180px] truncate">
-              Select your location
+              {defaultLocation ? defaultLocation.address : "Select your location"}
             </span>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-4 h-4">
               <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
@@ -144,6 +159,11 @@ export function Navbar() {
           </Sheet>
         </div>
       </div>
+      
+      <LocationModal 
+        open={isLocationModalOpen} 
+        onOpenChange={setIsLocationModalOpen} 
+      />
     </header>
   );
 }

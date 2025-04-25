@@ -1,245 +1,375 @@
 
-import React, { useState } from 'react';
-import { PlusCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
+import { 
+  Table, 
+  TableBody, 
+  TableCaption, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from "@/components/ui/table";
+import { PlusCircle, RefreshCw, Search } from "lucide-react";
 import { ServiceCard } from "@/components/admin/services/ServiceCard";
 import { ServiceFormDialog } from "@/components/admin/services/ServiceFormDialog";
 import { CategoryFormDialog } from "@/components/admin/services/CategoryFormDialog";
-import { Tables } from "@/integrations/supabase/types";
-import { fetchServices, toggleServiceStatus } from "@/services/supabase/services";
-import { fetchCategories, createCategory, updateCategory } from "@/services/supabase/categories";
+import { useToast } from "@/hooks/use-toast";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { fetchServices, fetchCategories, createService, updateService } from "@/services/supabase/services";
+import { createCategory, updateCategory } from "@/services/supabase/categories";
+import { uploadServiceImage } from "@/services/supabase/storage";
+import { supabase } from "@/integrations/supabase/client";
 
 const AdminServicesPage = () => {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState('all');
-  const [selectedService, setSelectedService] = useState<Tables<'services'> | null>(null);
-  const [isAddingService, setIsAddingService] = useState(false);
-  const [isAddingCategory, setIsAddingCategory] = useState(false);
-  const [newCategory, setNewCategory] = useState({ 
-    name: '', 
-    description: '',
-    image_url: '' 
-  });
-  const [editForm, setEditForm] = useState({
-    id: 0,
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isServiceFormOpen, setIsServiceFormOpen] = useState(false);
+  const [isCategoryFormOpen, setIsCategoryFormOpen] = useState(false);
+  const [editingService, setEditingService] = useState<any>(null);
+  const [editingCategory, setEditingCategory] = useState<any>(null);
+  
+  // Fixed category form state - include isActive property
+  const [categoryForm, setCategoryForm] = useState<{ name: string; description: string; image_url: string; isActive: boolean }>({
     name: '',
     description: '',
-    price: 0,
-    categoryId: 1,
-    duration: '',
-    isActive: true,
-    image: ''
+    image_url: '',
+    isActive: true
   });
   
-  const { data: servicesData, isLoading: servicesLoading } = useQuery({
-    queryKey: ['services'],
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Queries for fetching data
+  const { 
+    data: services = [], 
+    isLoading: servicesLoading 
+  } = useQuery({
+    queryKey: ['admin-services'],
     queryFn: fetchServices
   });
-
-  const { data: categoriesData, isLoading: categoriesLoading } = useQuery({
-    queryKey: ['categories'],
+  
+  const { 
+    data: categories = [], 
+    isLoading: categoriesLoading 
+  } = useQuery({
+    queryKey: ['admin-categories'],
     queryFn: fetchCategories
   });
 
-  const services = servicesData || [];
-  const categories = categoriesData || [];
-  
-  const deleteServiceMutation = useMutation({
-    mutationFn: async (serviceId: number) => {
-      const { error } = await supabase
-        .from('services')
-        .delete()
-        .eq('id', serviceId);
-      
-      if (error) throw error;
-    },
+  // Mutations for creating/updating services
+  const createServiceMutation = useMutation({
+    mutationFn: createService,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['services'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-services'] });
+      setIsServiceFormOpen(false);
       toast({
-        title: "Service Deleted",
-        description: "Service removed successfully"
+        title: "Service Created",
+        description: "The service has been created successfully.",
       });
     },
     onError: (error) => {
-      toast({ 
-        title: "Delete Failed", 
-        description: error instanceof Error ? error.message : "An error occurred",
-        variant: "destructive" 
+      console.error('Error creating service:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create service. Please try again.",
+        variant: "destructive",
       });
     }
   });
 
+  const updateServiceMutation = useMutation({
+    mutationFn: updateService,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-services'] });
+      setIsServiceFormOpen(false);
+      setEditingService(null);
+      toast({
+        title: "Service Updated",
+        description: "The service has been updated successfully.",
+      });
+    },
+    onError: (error) => {
+      console.error('Error updating service:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update service. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Mutations for creating/updating categories
   const createCategoryMutation = useMutation({
     mutationFn: createCategory,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
+      setIsCategoryFormOpen(false);
       toast({
         title: "Category Created",
-        description: "New category added successfully"
+        description: "The category has been created successfully.",
       });
-      setIsAddingCategory(false);
     },
     onError: (error) => {
-      toast({ 
-        title: "Failed to create category", 
-        description: error instanceof Error ? error.message : "An error occurred",
-        variant: "destructive" 
+      console.error('Error creating category:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create category. Please try again.",
+        variant: "destructive",
       });
     }
   });
-  
-  const filteredServices = services.filter(service => 
-    activeTab === 'all' || 
-    service.category_id === parseInt(activeTab)
-  );
-  
-  const handleAddService = () => {
-    setIsAddingService(true);
-    setSelectedService(null);
-    setEditForm({
-      id: 0,
-      name: '',
-      description: '',
-      price: 0,
-      categoryId: categories.length > 0 ? categories[0].id : 1,
-      duration: '30',
-      isActive: true,
-      image: ''
-    });
-  };
-  
-  const handleEditService = (service: Tables<'services'>) => {
-    setSelectedService(service);
-    setEditForm({
-      id: service.id,
-      name: service.name,
-      description: service.description || '',
-      price: service.price,
-      categoryId: service.category_id || 1,
-      duration: service.duration_minutes?.toString() || '',
-      isActive: service.is_active || true,
-      image: service.image_url || ''
-    });
-  };
-  
-  const handleSaveService = () => {
-    queryClient.invalidateQueries({ queryKey: ['services'] });
-    if (selectedService) {
-      setSelectedService(null);
-    } else {
-      setIsAddingService(false);
+
+  const updateCategoryMutation = useMutation({
+    mutationFn: updateCategory,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
+      setIsCategoryFormOpen(false);
+      setEditingCategory(null);
+      toast({
+        title: "Category Updated",
+        description: "The category has been updated successfully.",
+      });
+    },
+    onError: (error) => {
+      console.error('Error updating category:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update category. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Handle service form submission
+  const handleServiceSubmit = async (data: any) => {
+    try {
+      // Handle image upload if there is a file
+      if (data.imageFile) {
+        const imageUrl = await uploadServiceImage(data.imageFile);
+        data.image_url = imageUrl;
+      }
+
+      if (editingService) {
+        updateServiceMutation.mutate({
+          id: editingService.id,
+          name: data.name,
+          price: parseFloat(data.price),
+          description: data.description,
+          category_id: parseInt(data.category_id),
+          image_url: data.image_url || editingService.image_url,
+          is_active: data.is_active
+        });
+      } else {
+        createServiceMutation.mutate({
+          name: data.name,
+          price: parseFloat(data.price),
+          description: data.description,
+          category_id: parseInt(data.category_id),
+          image_url: data.image_url,
+          is_active: data.is_active
+        });
+      }
+    } catch (error) {
+      console.error("Error processing service form:", error);
+      toast({
+        title: "Error",
+        description: "There was an error processing your request.",
+        variant: "destructive",
+      });
     }
   };
-  
-  const handleSaveCategory = () => {
-    createCategoryMutation.mutate(newCategory);
-  };
-  
-  const handleDeleteService = (serviceId: number) => {
-    deleteServiceMutation.mutate(serviceId);
+
+  // Handle category form submission
+  const handleCategorySubmit = async (data: any) => {
+    try {
+      // Handle image upload if there is a file
+      if (data.imageFile) {
+        const imageUrl = await uploadServiceImage(data.imageFile);
+        data.image_url = imageUrl;
+      }
+
+      if (editingCategory) {
+        updateCategoryMutation.mutate({
+          id: editingCategory.id,
+          name: data.name,
+          description: data.description,
+          image_url: data.image_url || editingCategory.image_url
+        });
+      } else {
+        createCategoryMutation.mutate({
+          name: data.name,
+          description: data.description,
+          image_url: data.image_url
+        });
+      }
+    } catch (error) {
+      console.error("Error processing category form:", error);
+      toast({
+        title: "Error",
+        description: "There was an error processing your request.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const isLoading = servicesLoading || categoriesLoading;
+  // Handle edit service
+  const handleEditService = (service: any) => {
+    setEditingService(service);
+    setIsServiceFormOpen(true);
+  };
 
-  if (isLoading) {
-    return <div className="flex justify-center items-center h-64">Loading services...</div>;
-  }
+  // Handle edit category
+  const handleEditCategory = (category: any) => {
+    setEditingCategory(category);
+    setCategoryForm({
+      name: category.name,
+      description: category.description || '',
+      image_url: category.image_url || '',
+      isActive: true // Setting a default value
+    });
+    setIsCategoryFormOpen(true);
+  };
+
+  // Filter services based on search query
+  const filteredServices = services.filter((service) => 
+    service.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Services</h1>
-        <p className="text-muted-foreground">Manage service offerings and categories</p>
+        <h1 className="text-3xl font-bold tracking-tight">Manage Services</h1>
+        <p className="text-muted-foreground">
+          Create and manage your service offerings
+        </p>
       </div>
-      
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-        <Tabs 
-          onValueChange={setActiveTab} 
-          value={activeTab} 
-          className="w-full"
-        >
+
+      <Tabs defaultValue="services">
+        <TabsList>
+          <TabsTrigger value="services">Services</TabsTrigger>
+          <TabsTrigger value="categories">Categories</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="services" className="space-y-4">
           <div className="flex justify-between items-center">
-            <TabsList className="grid grid-flow-col auto-cols-max gap-2">
-              <TabsTrigger value="all">All Services</TabsTrigger>
-              {categories.map(category => (
-                <TabsTrigger key={category.id} value={category.id.toString()}>
-                  {category.name}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-            <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => {
-                  setIsAddingCategory(true);
-                  setNewCategory({ name: '', description: '', image_url: '' });
-                }}
-              >
-                Add Category
-              </Button>
-              <Button 
-                size="sm" 
-                onClick={handleAddService}
-              >
-                <PlusCircle className="h-4 w-4 mr-2" />
-                Add Service
-              </Button>
+            <div className="relative w-full max-w-xs">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search services..."
+                className="pl-8"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
+            <Button onClick={() => {
+              setEditingService(null);
+              setIsServiceFormOpen(true);
+            }}>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Add Service
+            </Button>
           </div>
-          
-          <TabsContent value={activeTab} className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredServices.map(service => (
+
+          {servicesLoading ? (
+            <div className="text-center py-8">
+              <RefreshCw className="animate-spin h-8 w-8 mx-auto text-muted-foreground" />
+              <p className="mt-2">Loading services...</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredServices.map((service) => (
                 <ServiceCard
                   key={service.id}
                   service={service}
-                  categories={categories}
-                  onEdit={handleEditService}
-                  onDelete={handleDeleteService}
+                  category={categories.find((c) => c.id === service.category_id)}
+                  onEdit={() => handleEditService(service)}
                 />
               ))}
-              
               {filteredServices.length === 0 && (
-                <div className="col-span-full flex items-center justify-center h-40 bg-slate-50 rounded-lg">
-                  <div className="text-center">
-                    <p className="text-sm text-slate-500 mb-4">No services found in this category</p>
-                    <Button size="sm" onClick={handleAddService}>
-                      <PlusCircle className="h-4 w-4 mr-2" />
-                      Add Service
-                    </Button>
-                  </div>
+                <div className="col-span-3 text-center py-8">
+                  <p className="text-muted-foreground">No services found</p>
                 </div>
               )}
             </div>
-          </TabsContent>
-        </Tabs>
-      </div>
-      
+          )}
+        </TabsContent>
+
+        <TabsContent value="categories" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold">Categories</h2>
+            <Button onClick={() => {
+              setEditingCategory(null);
+              setIsCategoryFormOpen(true);
+            }}>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Add Category
+            </Button>
+          </div>
+
+          <div className="border rounded-md">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Services</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {categoriesLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center h-24">
+                      <RefreshCw className="animate-spin h-6 w-6 mx-auto text-muted-foreground" />
+                    </TableCell>
+                  </TableRow>
+                ) : categories.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center h-24">
+                      No categories found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  categories.map((category) => (
+                    <TableRow key={category.id}>
+                      <TableCell className="font-medium">{category.name}</TableCell>
+                      <TableCell>{category.description}</TableCell>
+                      <TableCell>
+                        {services.filter((s) => s.category_id === category.id).length}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEditCategory(category)}
+                        >
+                          Edit
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+      </Tabs>
+
       <ServiceFormDialog
-        isOpen={isAddingService || !!selectedService}
-        onClose={() => {
-          setIsAddingService(false);
-          setSelectedService(null);
-        }}
-        onSave={handleSaveService}
-        editForm={editForm}
-        setEditForm={setEditForm}
+        open={isServiceFormOpen}
+        onOpenChange={setIsServiceFormOpen}
+        onSubmit={handleServiceSubmit}
         categories={categories}
-        selectedService={selectedService}
+        service={editingService}
       />
-      
+
       <CategoryFormDialog
-        isOpen={isAddingCategory}
-        onClose={() => setIsAddingCategory(false)}
-        onSave={handleSaveCategory}
-        newCategory={newCategory}
-        setNewCategory={setNewCategory}
+        open={isCategoryFormOpen}
+        onOpenChange={setIsCategoryFormOpen}
+        onSubmit={handleCategorySubmit}
+        category={editingCategory}
       />
     </div>
   );
