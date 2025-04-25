@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tables } from "@/integrations/supabase/types";
 import { useToast } from "@/hooks/use-toast";
 import { createService, updateService } from "@/services/supabase/services";
-import { supabase } from "@/integrations/supabase/client";
+import { uploadServiceImage } from "@/services/supabase/storage";
 
 interface ServiceFormDialogProps {
   isOpen: boolean;
@@ -46,7 +46,7 @@ export const ServiceFormDialog: React.FC<ServiceFormDialogProps> = ({
   onSave,
   editForm,
   setEditForm,
-  categories = [], // Provide a default empty array
+  categories = [], 
   selectedService
 }) => {
   const { toast } = useToast();
@@ -97,31 +97,6 @@ export const ServiceFormDialog: React.FC<ServiceFormDialogProps> = ({
     reader.readAsDataURL(file);
   };
 
-  const uploadImage = async (file: File): Promise<string | null> => {
-    try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
-      const filePath = `services/${fileName}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('service-images')
-        .upload(filePath, file);
-        
-      if (uploadError) {
-        throw uploadError;
-      }
-      
-      const { data } = supabase.storage
-        .from('service-images')
-        .getPublicUrl(filePath);
-        
-      return data.publicUrl;
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      return null;
-    }
-  };
-
   const handleSave = async () => {
     try {
       setIsLoading(true);
@@ -129,10 +104,19 @@ export const ServiceFormDialog: React.FC<ServiceFormDialogProps> = ({
       let imageUrl = editForm.image;
       
       if (imageFile) {
-        const uploadedUrl = await uploadImage(imageFile);
-        if (uploadedUrl) {
-          imageUrl = uploadedUrl;
-        } else {
+        try {
+          const uploadedUrl = await uploadServiceImage(imageFile);
+          if (uploadedUrl) {
+            imageUrl = uploadedUrl;
+          } else {
+            toast({
+              title: "Warning",
+              description: "Failed to upload image, but continuing with service save.",
+              variant: "destructive"
+            });
+          }
+        } catch (uploadError) {
+          console.error('Image upload error:', uploadError);
           toast({
             title: "Warning",
             description: "Failed to upload image, but continuing with service save.",
@@ -151,7 +135,7 @@ export const ServiceFormDialog: React.FC<ServiceFormDialogProps> = ({
         image_url: imageUrl
       };
 
-      if (selectedService) {
+      if (selectedService && selectedService.id) {
         await updateService(selectedService.id, serviceData);
         toast({
           title: "Service Updated",
@@ -181,9 +165,11 @@ export const ServiceFormDialog: React.FC<ServiceFormDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={() => {
-      onClose();
-      setImageFile(null);
-      setImagePreview(null);
+      if (isOpen) {
+        onClose();
+        setImageFile(null);
+        setImagePreview(null);
+      }
     }}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
@@ -212,11 +198,15 @@ export const ServiceFormDialog: React.FC<ServiceFormDialogProps> = ({
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent>
-                {categories && categories.map(category => (
-                  <SelectItem key={category.id} value={category.id.toString()}>
-                    {category.name || "Unnamed Category"}
-                  </SelectItem>
-                ))}
+                {categories && categories.length > 0 ? (
+                  categories.map(category => (
+                    <SelectItem key={category.id} value={category.id.toString()}>
+                      {category.name || "Unnamed Category"}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="none" disabled>No categories available</SelectItem>
+                )}
               </SelectContent>
             </Select>
           </div>
