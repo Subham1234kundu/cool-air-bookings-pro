@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Table, 
   TableBody, 
+  TableCaption, 
   TableCell, 
   TableHead, 
   TableHeader, 
@@ -173,10 +174,9 @@ const AdminServicesPage = () => {
 
   const handleCategorySubmit = async (data: any) => {
     try {
-      let imageUrl = editingCategory?.image_url || '';
-      
       if (data.imageFile) {
-        imageUrl = await uploadServiceImage(data.imageFile);
+        const imageUrl = await uploadServiceImage(data.imageFile);
+        data.image_url = imageUrl;
       }
 
       if (editingCategory) {
@@ -185,14 +185,16 @@ const AdminServicesPage = () => {
           categoryData: {
             name: data.name,
             description: data.description,
-            image_url: imageUrl
+            image_url: data.image_url || editingCategory.image_url,
+            is_active: true
           }
         });
       } else {
         createCategoryMutation.mutate({
           name: data.name,
           description: data.description,
-          image_url: imageUrl
+          image_url: data.image_url,
+          is_active: true
         });
       }
     } catch (error) {
@@ -368,9 +370,10 @@ const AdminServicesPage = () => {
           id: editingCategory?.id,
           name: editingCategory?.name || '',
           description: editingCategory?.description || '',
-          image_url: editingCategory?.image_url || ''
+          image_url: editingCategory?.image_url || '',
+          isActive: true
         }}
-        setNewCategory={(value) => setEditingCategory(value as any)}
+        setNewCategory={setEditingCategory}
       />
     </div>
   );
