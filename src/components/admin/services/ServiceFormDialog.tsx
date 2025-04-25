@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,14 +53,34 @@ export const ServiceFormDialog: React.FC<ServiceFormDialogProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
-  // Initialize the form properly when the dialog opens or the selected service changes
   useEffect(() => {
     if (selectedService) {
+      setEditForm({
+        id: selectedService.id,
+        name: selectedService.name || '',
+        description: selectedService.description || '',
+        price: selectedService.price || 0,
+        categoryId: selectedService.category_id || (categories[0]?.id || 1),
+        duration: selectedService.duration_minutes?.toString() || '30',
+        isActive: selectedService.is_active ?? true,
+        image: selectedService.image_url || ''
+      });
       setImagePreview(selectedService.image_url || null);
     } else {
+      setEditForm({
+        id: 0,
+        name: '',
+        description: '',
+        price: 0,
+        categoryId: categories[0]?.id || 1,
+        duration: '30',
+        isActive: true,
+        image: ''
+      });
       setImagePreview(null);
     }
-  }, [selectedService, isOpen]);
+    setImageFile(null);
+  }, [selectedService, isOpen, categories, setEditForm]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -69,7 +88,6 @@ export const ServiceFormDialog: React.FC<ServiceFormDialogProps> = ({
     
     setImageFile(file);
     
-    // Create preview
     const reader = new FileReader();
     reader.onloadend = () => {
       setImagePreview(reader.result as string);
@@ -108,7 +126,6 @@ export const ServiceFormDialog: React.FC<ServiceFormDialogProps> = ({
       
       let imageUrl = editForm.image;
       
-      // Upload image if there's a new file
       if (imageFile) {
         const uploadedUrl = await uploadImage(imageFile);
         if (uploadedUrl) {
@@ -147,6 +164,7 @@ export const ServiceFormDialog: React.FC<ServiceFormDialogProps> = ({
       }
 
       onSave();
+      onClose();
     } catch (error) {
       toast({
         title: "Error",
@@ -159,7 +177,11 @@ export const ServiceFormDialog: React.FC<ServiceFormDialogProps> = ({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={() => {
+      onClose();
+      setImageFile(null);
+      setImagePreview(null);
+    }}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>{selectedService ? 'Edit Service' : 'Add New Service'}</DialogTitle>
