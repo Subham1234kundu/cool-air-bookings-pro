@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,7 +16,6 @@ interface CategoryFormDialogProps {
     name: string;
     description?: string;
     image_url?: string;
-    isActive: boolean;
   };
   setNewCategory: React.Dispatch<React.SetStateAction<any>>;
 }
@@ -30,25 +30,41 @@ export const CategoryFormDialog: React.FC<CategoryFormDialogProps> = ({
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(newCategory.image_url || null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  
+  // Reset state when dialog opens/closes or category changes
+  useEffect(() => {
+    setImagePreview(newCategory.image_url || null);
+    setImageFile(null);
+  }, [isOpen, newCategory.image_url]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setIsLoading(true);
 
-    const formData = new FormData(event.target as HTMLFormElement);
-    const name = formData.get('name') as string;
-    const description = formData.get('description') as string;
+    try {
+      const formData = new FormData(event.target as HTMLFormElement);
+      const name = formData.get('name') as string;
+      const description = formData.get('description') as string;
 
-    const data = {
-      name: name,
-      description: description,
-      imageFile: imageFile,
-    };
+      const data = {
+        name: name,
+        description: description,
+        imageFile: imageFile,
+      };
 
-    onSave(data);
-    setIsLoading(false);
-    onClose();
+      onSave(data);
+      setIsLoading(false);
+      onClose();
+    } catch (error) {
+      console.error("Error submitting category form:", error);
+      toast({
+        title: "Error",
+        description: "There was an error saving the category.",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+    }
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -75,9 +91,11 @@ export const CategoryFormDialog: React.FC<CategoryFormDialogProps> = ({
             <Label htmlFor="name" className="col-span-1">Name</Label>
             <Input
               id="name"
+              name="name"
               defaultValue={newCategory.name}
               className="col-span-3"
               onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
+              required
             />
           </div>
 
@@ -85,6 +103,7 @@ export const CategoryFormDialog: React.FC<CategoryFormDialogProps> = ({
             <Label htmlFor="description" className="col-span-1 pt-2">Description</Label>
             <Textarea
               id="description"
+              name="description"
               defaultValue={newCategory.description}
               className="col-span-3"
               rows={3}
