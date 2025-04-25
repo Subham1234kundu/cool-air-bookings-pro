@@ -5,38 +5,34 @@ import { supabase } from "@/integrations/supabase/client";
  * Create service-images bucket if it doesn't exist
  */
 export async function ensureServiceImagesBucket() {
-  try {
-    const { data: buckets } = await supabase.storage.listBuckets();
+  const { data: buckets } = await supabase.storage.listBuckets();
+  
+  const bucket = buckets?.find(b => b.name === 'service-images');
+  
+  if (!bucket) {
+    const { data, error } = await supabase.storage.createBucket('service-images', {
+      public: true,
+      fileSizeLimit: 10 * 1024 * 1024, // 10MB
+    });
     
-    const bucket = buckets?.find(b => b.name === 'service-images');
-    
-    if (!bucket) {
-      const { data, error } = await supabase.storage.createBucket('service-images', {
-        public: true,
-        fileSizeLimit: 10 * 1024 * 1024, // 10MB
-      });
-      
-      if (error) {
-        console.error('Error creating service-images bucket:', error);
-        throw error;
-      }
-      
-      console.log('Created service-images bucket:', data);
-      
-      // Set public policy for the bucket
-      const { error: policyError } = await supabase.storage.from('service-images').updateBucket({
-        public: true,
-        allowedMimeTypes: ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
-      });
-      
-      if (policyError) {
-        console.error('Error setting bucket permissions:', policyError);
-      }
+    if (error) {
+      console.error('Error creating service-images bucket:', error);
+      throw error;
     }
-    return true;
-  } catch (error) {
-    console.error('Error in ensureServiceImagesBucket:', error);
-    return false;
+    
+    console.log('Created service-images bucket:', data);
+    
+    // Add public policy to the bucket
+    const { error: policyError } = await supabase.storage.from('service-images').createBucketWithPermissions({
+      permissions: {
+        read: 'public',
+        write: 'service_role'
+      }
+    });
+    
+    if (policyError) {
+      console.error('Error setting bucket permissions:', policyError);
+    }
   }
 }
 

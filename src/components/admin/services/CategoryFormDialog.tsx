@@ -6,7 +6,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { uploadServiceImage } from "@/services/supabase/storage";
 
 interface CategoryFormDialogProps {
   isOpen: boolean;
@@ -47,39 +46,16 @@ export const CategoryFormDialog: React.FC<CategoryFormDialogProps> = ({
       const formData = new FormData(event.target as HTMLFormElement);
       const name = formData.get('name') as string;
       const description = formData.get('description') as string;
-      
-      let imageUrl = newCategory.image_url || "";
-      
-      if (imageFile) {
-        try {
-          const uploadedUrl = await uploadServiceImage(imageFile);
-          if (uploadedUrl) {
-            imageUrl = uploadedUrl;
-          } else {
-            toast({
-              title: "Warning",
-              description: "Failed to upload image, but continuing with category save.",
-              variant: "destructive"
-            });
-          }
-        } catch (error) {
-          console.error("Error uploading category image:", error);
-          toast({
-            title: "Warning",
-            description: "Failed to upload image, but continuing with category save.",
-            variant: "destructive"
-          });
-        }
-      }
 
       const data = {
         name: name,
         description: description,
         imageFile: imageFile,
-        image_url: imageUrl
       };
 
       onSave(data);
+      setIsLoading(false);
+      onClose();
     } catch (error) {
       console.error("Error submitting category form:", error);
       toast({
@@ -87,7 +63,6 @@ export const CategoryFormDialog: React.FC<CategoryFormDialogProps> = ({
         description: "There was an error saving the category.",
         variant: "destructive",
       });
-    } finally {
       setIsLoading(false);
     }
   };
