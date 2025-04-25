@@ -18,25 +18,17 @@ import { ServiceFormDialog } from "@/components/admin/services/ServiceFormDialog
 import { CategoryFormDialog } from "@/components/admin/services/CategoryFormDialog";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { fetchServices, fetchCategories, createService, updateService } from "@/services/supabase/services";
-import { createCategory, updateCategory } from "@/services/supabase/categories";
+import { fetchServices, createService, updateService, toggleServiceStatus } from "@/services/supabase/services";
+import { fetchCategories, createCategory, updateCategory } from "@/services/supabase/categories";
 import { uploadServiceImage } from "@/services/supabase/storage";
-import { supabase } from "@/integrations/supabase/client";
+import { Tables } from "@/integrations/supabase/types";
 
 const AdminServicesPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isServiceFormOpen, setIsServiceFormOpen] = useState(false);
   const [isCategoryFormOpen, setIsCategoryFormOpen] = useState(false);
-  const [editingService, setEditingService] = useState<any>(null);
-  const [editingCategory, setEditingCategory] = useState<any>(null);
-  
-  // Fixed category form state - include isActive property
-  const [categoryForm, setCategoryForm] = useState<{ name: string; description: string; image_url: string; isActive: boolean }>({
-    name: '',
-    description: '',
-    image_url: '',
-    isActive: true
-  });
+  const [editingService, setEditingService] = useState<Tables<'services'> | null>(null);
+  const [editingCategory, setEditingCategory] = useState<Tables<'categories'> | null>(null);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -80,7 +72,7 @@ const AdminServicesPage = () => {
   });
 
   const updateServiceMutation = useMutation({
-    mutationFn: updateService,
+    mutationFn: (params: { id: number, serviceData: any }) => updateService(params.id, params.serviceData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-services'] });
       setIsServiceFormOpen(false);
@@ -122,7 +114,7 @@ const AdminServicesPage = () => {
   });
 
   const updateCategoryMutation = useMutation({
-    mutationFn: updateCategory,
+    mutationFn: (params: { id: number, categoryData: any }) => updateCategory(params.id, params.categoryData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
       setIsCategoryFormOpen(false);
@@ -154,12 +146,15 @@ const AdminServicesPage = () => {
       if (editingService) {
         updateServiceMutation.mutate({
           id: editingService.id,
-          name: data.name,
-          price: parseFloat(data.price),
-          description: data.description,
-          category_id: parseInt(data.category_id),
-          image_url: data.image_url || editingService.image_url,
-          is_active: data.is_active
+          serviceData: {
+            name: data.name,
+            price: parseFloat(data.price),
+            description: data.description,
+            category_id: parseInt(data.category_id),
+            duration_minutes: parseInt(data.duration),
+            image_url: data.image_url || editingService.image_url,
+            is_active: data.is_active
+          }
         });
       } else {
         createServiceMutation.mutate({
@@ -167,6 +162,7 @@ const AdminServicesPage = () => {
           price: parseFloat(data.price),
           description: data.description,
           category_id: parseInt(data.category_id),
+          duration_minutes: parseInt(data.duration),
           image_url: data.image_url,
           is_active: data.is_active
         });
@@ -193,9 +189,11 @@ const AdminServicesPage = () => {
       if (editingCategory) {
         updateCategoryMutation.mutate({
           id: editingCategory.id,
-          name: data.name,
-          description: data.description,
-          image_url: data.image_url || editingCategory.image_url
+          categoryData: {
+            name: data.name,
+            description: data.description,
+            image_url: data.image_url || editingCategory.image_url
+          }
         });
       } else {
         createCategoryMutation.mutate({
@@ -215,21 +213,21 @@ const AdminServicesPage = () => {
   };
 
   // Handle edit service
-  const handleEditService = (service: any) => {
+  const handleEditService = (service: Tables<'services'>) => {
     setEditingService(service);
     setIsServiceFormOpen(true);
   };
 
   // Handle edit category
-  const handleEditCategory = (category: any) => {
+  const handleEditCategory = (category: Tables<'categories'>) => {
     setEditingCategory(category);
-    setCategoryForm({
-      name: category.name,
-      description: category.description || '',
-      image_url: category.image_url || '',
-      isActive: true // Setting a default value
-    });
     setIsCategoryFormOpen(true);
+  };
+  
+  // Handle delete service
+  const handleDeleteService = (serviceId: number) => {
+    // This function would be implemented if delete functionality is needed
+    console.log("Delete service:", serviceId);
   };
 
   // Filter services based on search query
@@ -283,8 +281,9 @@ const AdminServicesPage = () => {
                 <ServiceCard
                   key={service.id}
                   service={service}
-                  category={categories.find((c) => c.id === service.category_id)}
+                  categories={categories}
                   onEdit={() => handleEditService(service)}
+                  onDelete={handleDeleteService}
                 />
               ))}
               {filteredServices.length === 0 && (
@@ -366,10 +365,11 @@ const AdminServicesPage = () => {
       />
 
       <CategoryFormDialog
-        open={isCategoryFormOpen}
-        onOpenChange={setIsCategoryFormOpen}
-        onSubmit={handleCategorySubmit}
-        category={editingCategory}
+        isOpen={isCategoryFormOpen}
+        onClose={() => setIsCategoryFormOpen(false)}
+        onSave={handleCategorySubmit}
+        newCategory={editingCategory || { name: '', isActive: true }}
+        setNewCategory={setEditingCategory}
       />
     </div>
   );

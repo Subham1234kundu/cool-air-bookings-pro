@@ -18,6 +18,8 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({
   onEdit,
   onDelete,
 }) => {
+  const category = categories.find(c => c.id === service.category_id);
+  
   return (
     <Card className={!service.is_active ? 'opacity-60' : ''}>
       <CardContent className="p-0">
@@ -41,7 +43,7 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({
           <p className="text-sm line-clamp-2">{service.description}</p>
           <div className="flex justify-between items-center mt-4">
             <span className="text-xs bg-slate-100 px-2 py-1 rounded">
-              {categories.find(c => c.id === service.category_id)?.name}
+              {category?.name || 'Uncategorized'}
             </span>
             <div className="flex gap-1">
               <Button variant="ghost" size="icon" onClick={() => onEdit(service)}>
