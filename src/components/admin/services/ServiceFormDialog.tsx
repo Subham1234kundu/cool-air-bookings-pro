@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,6 +53,15 @@ export const ServiceFormDialog: React.FC<ServiceFormDialogProps> = ({
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  // Initialize the form properly when the dialog opens or the selected service changes
+  useEffect(() => {
+    if (selectedService) {
+      setImagePreview(selectedService.image_url || null);
+    } else {
+      setImagePreview(null);
+    }
+  }, [selectedService, isOpen]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -170,16 +179,16 @@ export const ServiceFormDialog: React.FC<ServiceFormDialogProps> = ({
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="category" className="col-span-1">Category</Label>
             <Select 
-              value={editForm.categoryId.toString()} 
+              value={editForm.categoryId?.toString() || ""} 
               onValueChange={(value) => setEditForm({...editForm, categoryId: parseInt(value)})}
             >
               <SelectTrigger className="col-span-3">
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent>
-                {categories.map(category => (
+                {categories && categories.map(category => (
                   <SelectItem key={category.id} value={category.id.toString()}>
-                    {category.name}
+                    {category.name || "Unnamed Category"}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -192,7 +201,7 @@ export const ServiceFormDialog: React.FC<ServiceFormDialogProps> = ({
               id="price" 
               type="number" 
               value={editForm.price} 
-              onChange={(e) => setEditForm({...editForm, price: parseFloat(e.target.value)})} 
+              onChange={(e) => setEditForm({...editForm, price: parseFloat(e.target.value) || 0})} 
               className="col-span-3" 
             />
           </div>
